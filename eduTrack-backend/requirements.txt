@@ -1,0 +1,15 @@
+pandas
+numpy
+openpyxl
+sqlalchemy
+sqlmodel
+psycopg[binary]
+pydantic
+python-dotenv
+python-decouple
+fastapi
+uvicorn
+gunicorn
+timescaledb
+pydantic[email]
+python-multipart
