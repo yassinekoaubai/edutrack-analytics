@@ -3,17 +3,42 @@ from sqlalchemy.orm import Session
 from typing import List
 from db.session import get_session as get_db
 from db import models
-from schemas.etudiant import EtudiantBase, EtudiantRead
+from schemas.etudiant import EtudiantListItem, EtudiantRead
 
 router = APIRouter()
 
-@router.get("/", response_model=List[EtudiantBase])
-def get_students(skip: int = 0, limit: int = 50, db: Session = Depends(get_db)):
+@router.get("/", response_model=List[EtudiantListItem])
+def get_students(skip: int = 0, limit: int = 500, db: Session = Depends(get_db)):
     """
     Retrieve list of students with their global segments.
     """
     students = db.query(models.Etudiant).offset(skip).limit(limit).all()
-    return students
+    result = []
+    for student in students:
+        classe_nom = None
+        inscription = (
+            db.query(models.Inscription)
+            .filter(models.Inscription.id_etudiant == student.id)
+            .order_by(models.Inscription.annee_scolaire.desc())
+            .first()
+        )
+        if inscription:
+            classe = db.query(models.Classe).filter(models.Classe.id == inscription.id_classe).first()
+            if classe:
+                classe_nom = classe.nom
+        result.append(
+            EtudiantListItem(
+                id=student.id,
+                nom=student.nom,
+                prenom=student.prenom,
+                date_naissance=student.date_naissance,
+                email=student.email,
+                statut=student.statut,
+                annee_entree=student.annee_entree,
+                classe=classe_nom,
+            )
+        )
+    return result
 
 @router.get("/{id}", response_model=EtudiantRead)
 def get_student_by_id(id: int, db: Session = Depends(get_db)):
