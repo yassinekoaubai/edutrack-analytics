@@ -1,14 +1,14 @@
 from datetime import date
 from typing import Optional
-from sqlmodel import SQLModel, Field
-from sqlalchemy import Column, Numeric
+from pydantic import BaseModel, Field, ConfigDict
 
-class EvaluationBase(SQLModel):
+class EvaluationBase(BaseModel):
     id_module: int
     nom_eval: Optional[str] = Field(default=None, max_length=100)
     date_prevue: Optional[date] = None
-    coefficient_eval: float = Field(default=1.0, sa_column=Column(Numeric(3,1)))
+    coefficient_eval: float = Field(default=1.0)
     semestre: Optional[str] = Field(default=None, max_length=10)
+    model_config = ConfigDict(from_attributes=True)
 
 class EvaluationCreate(EvaluationBase):
     pass

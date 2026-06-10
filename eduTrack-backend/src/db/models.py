@@ -109,7 +109,7 @@ class Note(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     id_etudiant: int = Field(foreign_key="etudiants.id", nullable=False)
     id_evaluation: int = Field(foreign_key="evaluations.id", nullable=False)
-    valeur: Optional[float] = Field(default=None, nullable=True) # NULL = absent
+    valeur: Optional[float] = Field(default=None, nullable=True)
     date_saisie: datetime = Field(default_factory=datetime.utcnow, nullable=False)
 
     etudiant: "Etudiant" = Relationship(back_populates="notes")

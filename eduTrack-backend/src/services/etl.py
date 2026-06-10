@@ -1,6 +1,6 @@
-from .validation import validate_etudiant_df, validate_module_df, validate_evaluation_df, validate_note_df
-from .cleaning import clean_etudiant_df, clean_module_df, clean_evaluation_df, clean_note_df
-from db.models import Etudiant, ImportLog, Module, Evaluation, Note
+from .validation import validate_etudiant_df, validate_module_df, validate_evaluation_df, validate_note_df, validate_absence_df, validate_retard_df
+from .cleaning import clean_etudiant_df, clean_module_df, clean_evaluation_df, clean_note_df, clean_absence_df, clean_retard_df
+from db.models import Etudiant, ImportLog, Module, Evaluation, Note, Absence, Retard
 from schemas.imports import ModuleImportRow, ImportResult
 from schemas.module import ModuleCreate
 from sqlmodel import Session, select
@@ -43,8 +43,6 @@ def process_etudiant_import(df: pd.DataFrame, filename: str, session: Session) -
         message="Import terminé"
     )
 
-
-
 def process_module_import(df: pd.DataFrame, filename: str, session: Session) -> ImportResult:
     # 1. Cleaning - Section 2.1
     df = clean_module_df(df)
@@ -81,7 +79,6 @@ def process_module_import(df: pd.DataFrame, filename: str, session: Session) -> 
         erreurs=errors[:10],
         message="Import terminé"
     )
-
 
 def process_evaluation_import(df: pd.DataFrame, filename: str, session: Session) -> ImportResult:
     # DEBUG: Check DB modules
@@ -131,20 +128,68 @@ def process_evaluation_import(df: pd.DataFrame, filename: str, session: Session)
         message="Import terminé"
     )
 
+from sqlalchemy.dialects.postgresql import insert
+from db.models import Note, ImportLog
+
 def process_note_import(df: pd.DataFrame, filename: str, session: Session) -> ImportResult:
     df = clean_note_df(df, session)
-
-    # DEBUG
-    print("=== NOTES APRES CLEANING ===")
-    print(df[['id_etudiant', 'id_evaluation', 'valeur']].head())
-
     validated_notes, errors = validate_note_df(df, session)
 
     nb_ok = 0
-    for note_data in validated_notes:
+    nb_rejet = len(errors)
+    
+    if validated_notes:
+        # Convert to dicts for bulk insert
+        values = [n.model_dump() for n in validated_notes]
+        
+        # Build upsert statement
+        stmt = insert(Note).values(values)
+        
+        # Update if duplicate (id_etudiant + id_evaluation)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=['id_etudiant', 'id_evaluation'],
+            set_={
+                'valeur': stmt.excluded.valeur,
+                'date_saisie': stmt.excluded.date_saisie
+            }
+        )
+        
+        result = session.execute(stmt)
+        session.commit()
+        # In PG, rowcount for upsert counts both inserted and updated rows
+        nb_ok = max(0, result.rowcount) 
+
+    log = ImportLog(
+        nom_fichier=filename,
+        type_donnees="notes",
+        nb_lignes_ok=nb_ok,
+        nb_lignes_rejet=nb_rejet,
+        statut="Terminé"
+    )
+    session.add(log)
+    session.commit()
+
+    return ImportResult(
+        nb_lignes_ok=nb_ok,
+        nb_lignes_rejet=nb_rejet,
+        erreurs=errors[:10],
+        message=f"Import terminé: {nb_ok} lignes traitées (insérées ou mises à jour)"
+    )
+
+def process_absence_import(df: pd.DataFrame, filename: str, session: Session) -> ImportResult:
+    df = clean_absence_df(df, session)
+
+    # DEBUG
+    print("=== ABSENCES APRES CLEANING ===")
+    print(df[['id_etudiant', 'id_module', 'date_absence', 'nb_heures', 'justifiee']].head())
+
+    validated_absences, errors = validate_absence_df(df, session)
+
+    nb_ok = 0
+    for absence_data in validated_absences:
         try:
-            db_note = Note.model_validate(note_data)
-            session.add(db_note)
+            db_absence = Absence.model_validate(absence_data)
+            session.add(db_absence)
             nb_ok += 1
         except Exception as e:
             errors.append(f"Erreur DB: {str(e)}")
@@ -153,10 +198,53 @@ def process_note_import(df: pd.DataFrame, filename: str, session: Session) -> Im
 
     log = ImportLog(
         nom_fichier=filename,
-        type_donnees="notes",
+        type_donnees="absences",
         nb_lignes_ok=nb_ok,
         nb_lignes_rejet=len(errors),
         statut="Terminé"
+    )
+    session.add(log)
+    session.commit()
+
+    return ImportResult(
+        nb_lignes_ok=nb_ok,
+        nb_lignes_rejet=len(errors),
+        erreurs=errors[:10],
+        message="Import terminé"
+    )
+
+def process_retard_import(df: pd.DataFrame, filename: str, session: Session) -> ImportResult:
+    df = clean_retard_df(df, session)
+
+    print("=== RETARDS APRES CLEANING ===")
+    cols = ['id_etudiant', 'id_module', 'date_retard', 'duree_minutes', 'est_justifie']
+    existing_cols = [c for c in cols if c in df.columns]
+    print(df[existing_cols].head())
+
+    validated_retards, errors = validate_retard_df(df, session)
+
+    nb_ok = 0
+    for retard_data in validated_retards:
+        try:
+            db_retard = Retard.model_validate(retard_data)
+            session.add(db_retard)
+            nb_ok += 1
+        except Exception as e:
+            errors.append(f"Erreur DB ligne {nb_ok + len(errors) + 1}: {str(e)}")
+
+    try:
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        errors.append(f"Erreur commit: {str(e)}")
+        nb_ok = 0
+
+    log = ImportLog(
+        nom_fichier=filename,
+        type_donnees="retards",
+        nb_lignes_ok=nb_ok,
+        nb_lignes_rejet=len(errors),
+        statut="Terminé" if nb_ok > 0 else "Echec"
     )
     session.add(log)
     session.commit()

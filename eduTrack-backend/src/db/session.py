@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Session, create_engine
 from .config import DATABASE_URL
-from . import models  # Ensure all SQLModel table metadata is imported before creating tables
+from . import models  
 
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is not set")
