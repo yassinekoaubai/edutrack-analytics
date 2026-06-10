@@ -1,7 +1,8 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends
-from sqlmodel import Session
-from db.session import init_db, get_session
+import os
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from db.session import init_db
 from api import imports, dashboards, students, alerts
 
 @asynccontextmanager
@@ -15,9 +16,21 @@ app = FastAPI(
     version="1.0.0"
 )
 
+_cors_origins = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173",
+).split(",")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[origin.strip() for origin in _cors_origins if origin.strip()],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Registering endpoints cleanly
-app.include_router(imports.router, prefix="/import", tags=["Imports Data Management"])
+app.include_router(imports.router)
 app.include_router(dashboards.router, prefix="/dashboard", tags=["Dashboard KPIs"])
 app.include_router(students.router, prefix="/students", tags=["Students Profiles"])
 app.include_router(alerts.router, prefix="/alerts", tags=["Pedagogical Alerts"])

@@ -25,6 +25,11 @@ class EtudiantUpdate(BaseModel):
     statut: Optional[str] = Field(default=None, max_length=20)
     annee_entree: Optional[int] = None
 
+# --- List Schema ---
+class EtudiantListItem(EtudiantBase):
+    id: int
+    classe: Optional[str] = None
+
 # --- Read Schema ---
 class EtudiantRead(EtudiantBase):
     id: int
