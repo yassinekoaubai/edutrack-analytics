@@ -1,41 +1,31 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { computeAllStudentStats, predictFailureRiskScore } from '../utils/dataEngine';
 import { useStudentsData, useStudentProfile } from '../hooks/useAcademicData';
-import { DataLoader } from './DataLoader';
-import { 
-  Search, 
-  Filter, 
-  Calendar, 
-  BookOpen, 
-  ShieldAlert, 
-  TrendingDown, 
-  User, 
-  CheckCircle,
-  FileSpreadsheet,
+import { DataLoader } from '../components/DataLoader';
+import { Badge, getStudentStatusVariant } from '../components/Badge';
+import {
+  Search,
+  Filter,
   X,
   Mail,
   Award,
   Clock,
-  ArrowRight
+  ArrowRight,
 } from 'lucide-react';
 
-interface StudentsSectionProps {
+interface StudentsPageProps {
   refreshKey?: number;
   selectedStudentId: string | null;
   onSelectStudent: (id: string | null) => void;
 }
 
-export const StudentsSection: React.FC<StudentsSectionProps> = ({
+/** Student directory with search, filters, and detailed profile view. */
+export function StudentsPage({
   refreshKey = 0,
   selectedStudentId,
   onSelectStudent,
-}) => {
-  const { students, modules, grades, absences, tardiness, evaluations, loading: listLoading, error: listError } =
+}: StudentsPageProps) {
+  const { students, grades, absences, tardiness, loading: listLoading, error: listError } =
     useStudentsData(refreshKey);
   const { data: profileData, loading: profileLoading, error: profileError } = useStudentProfile(selectedStudentId, refreshKey);
 
@@ -43,32 +33,37 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
   const [classFilter, setClassFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  // Compute stats for the list
   const studentStats = useMemo(() => {
     return computeAllStudentStats(students, grades, absences, tardiness);
   }, [students, grades, absences, tardiness]);
 
-  // List of distinct classes for select filters
   const distinctClasses = useMemo(() => {
     return Array.from(new Set(students.map((s) => s.className)));
   }, [students]);
 
-  // Filter students
   const filteredStudents = useMemo(() => {
     return students.filter((s) => {
-      const matchSearch = `${s.firstName} ${s.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) || s.email.toLowerCase().includes(searchQuery.toLowerCase()) || s.id.toLowerCase().includes(searchQuery.toLowerCase());
+      const firstName = typeof s.firstName === 'string' ? s.firstName : '';
+      const lastName = typeof s.lastName === 'string' ? s.lastName : '';
+      const email = typeof s.email === 'string' ? s.email : '';
+      const id = typeof s.id === 'string' ? s.id : '';
+      const query = typeof searchQuery === 'string' ? searchQuery : '';
+
+      const fullName = `${firstName} ${lastName}`.toLowerCase();
+      const emailLower = email.toLowerCase();
+      const idLower = id.toLowerCase();
+      const queryLower = query.toLowerCase();
+
+      const matchSearch = fullName.includes(queryLower) || emailLower.includes(queryLower) || idLower.includes(queryLower);
       const matchClass = classFilter === 'all' || s.className === classFilter;
       const matchStatus = statusFilter === 'all' || s.status === statusFilter;
       return matchSearch && matchClass && matchStatus;
     });
   }, [students, searchQuery, classFilter, statusFilter]);
 
-  // Detailed selected student data (Now using backend data)
   const studentProfile = useMemo(() => {
     if (!profileData) return null;
 
-    // We still need the base student object for names/etc if not fully in profileData
-    // But profileData from backend (EtudiantRead) should have everything
     const stats = studentStats[String(profileData.id)] || {
       gpa: 0,
       totalAbsences: profileData.absences_count || 0,
@@ -78,10 +73,8 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
       rank: profileData.classement || 0
     };
 
-    // Use risk score from backend if available
     const failureRiskScore = profileData.risk_score ?? predictFailureRiskScore(stats, 10, 8);
 
-    // Generate recommendations
     const recommendations: string[] = [];
     if (profileData.notes) {
       profileData.notes.forEach(n => {
@@ -90,10 +83,10 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
         }
       });
     }
-    
+
     if (stats.gpa < 10) recommendations.push("⚠️ Moyenne globale sous la barre d'admission (10/20).");
     if (stats.totalAbsences > 6) recommendations.push("🛑 Seuil critique d'absences dépassé.");
-    
+
     if (recommendations.length === 0) {
       recommendations.push("🌟 Excellence académique et assiduité remarquable.");
     }
@@ -120,14 +113,12 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
     <div id="students-section" className="space-y-6 animate-fade-in">
 
       {selectedStudentId && studentProfile ? (
-        /* Detailed Student File view */
         <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-md animate-scale-up space-y-6">
-          
-          {/* Header row with breadcrumb-like close */}
+
           <div className="flex justify-between items-start border-b border-slate-50 pb-5">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-[#AFE3F4] text-slate-950 flex items-center justify-center font-bold font-sans text-xl shadow-xs">
-                {studentProfile.student.firstName.charAt(0)}{studentProfile.student.lastName.charAt(0)}
+                {(studentProfile.student.firstName || '?').charAt(0)}{(studentProfile.student.lastName || '?').charAt(0)}
               </div>
               <div>
                 <div className="flex items-center gap-3">
@@ -146,7 +137,7 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
               </div>
             </div>
 
-            <button 
+            <button
               onClick={() => onSelectStudent(null)}
               id="btn-close-profile"
               className="p-2 border border-slate-200/50 hover:bg-slate-50 text-slate-400 hover:text-slate-700 rounded-xl cursor-pointer"
@@ -157,12 +148,11 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* Column 1: Study indicators card */}
+
             <div className="space-y-6">
               <div className="bg-slate-50 border border-slate-100 p-5 rounded-2xl relative overflow-hidden space-y-4">
                 <h4 className="text-xs uppercase font-bold tracking-wider text-slate-400 font-sans">Performance Trimestrielle</h4>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <span className="text-[10px] text-slate-400 font-bold block font-sans">MOYENNE</span>
@@ -198,7 +188,6 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
                 </div>
               </div>
 
-              {/* Predictor Panel: BONUS A failure score */}
               <div className="p-5 border border-slate-200 rounded-2xl space-y-3.5 relative">
                 <div className="flex justify-between items-center">
                   <h4 className="text-xs font-extrabold text-slate-700 font-sans tracking-tight uppercase">Risque de Décrochage</h4>
@@ -206,9 +195,9 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
                 </div>
 
                 <div className="relative h-4 bg-slate-100 rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className="h-full rounded-full transition-all duration-700"
-                    style={{ 
+                    style={{
                       width: `${studentProfile.failureRiskScore}%`,
                       backgroundColor: studentProfile.failureRiskScore > 50 ? '#EF4444' : studentProfile.failureRiskScore > 30 ? '#F59E0B' : '#10B981'
                     }}
@@ -230,10 +219,8 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
               </div>
             </div>
 
-            {/* Column 2 & 3: Modules detail grid and logs */}
             <div className="lg:col-span-2 space-y-6">
-              
-              {/* Grades Grid table */}
+
               <div className="border border-slate-200/60 rounded-2xl overflow-hidden">
                 <div className="bg-slate-50 p-4 border-b border-slate-150 flex items-center justify-between">
                   <span className="text-xs font-bold font-mono uppercase text-slate-600">Relevé Synthétique de Notes</span>
@@ -268,12 +255,11 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
                 </div>
               </div>
 
-              {/* Pedagogic Recommendations List */}
               <div className="bg-white p-5 border border-slate-100 rounded-2xl shadow-xs space-y-3">
                 <h4 className="text-xs uppercase font-extrabold tracking-wider text-slate-500 font-sans">
                   Préconisations Pédagogiques individualisées
                 </h4>
-                
+
                 <div className="space-y-2">
                   {studentProfile.recommendations.map((rec, rIdx) => (
                     <div key={rIdx} className="p-3 bg-slate-50/70 border border-slate-100 rounded-xl text-[11px] leading-relaxed text-slate-700 font-sans flex items-start gap-2.5">
@@ -290,13 +276,10 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
 
         </div>
       ) : (
-        /* Students Directory List */
         <div className="space-y-6">
-          
-          {/* Filters shelf */}
+
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs flex flex-col md:flex-row gap-4 items-center">
-            
-            {/* Search Input */}
+
             <div className="relative flex-1 w-full">
               <Search className="absolute left-3.5 top-3 text-slate-400 w-4 h-4" />
               <input
@@ -309,7 +292,6 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
               />
             </div>
 
-            {/* Class selection dropdown */}
             <div className="flex items-center gap-2 w-full md:w-fit shrink-0">
               <Filter className="w-4 h-4 text-slate-400 shrink-0" />
               <select
@@ -325,7 +307,6 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
               </select>
             </div>
 
-            {/* Status selection dropdown */}
             <div className="w-full md:w-fit shrink-0">
               <select
                 id="status-filter"
@@ -344,13 +325,11 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
 
           </div>
 
-          {/* Directory Count */}
           <div className="flex justify-between items-center text-xs text-slate-500 font-sans px-2">
             <span>{filteredStudents.length} étudiant{filteredStudents.length > 1 ? 's' : ''} correspondant{filteredStudents.length > 1 ? 's' : ''}</span>
             <span>Conseil: Cliquez sur un étudiant pour consulter sa fiche détaillée.</span>
           </div>
 
-          {/* Students list grid table */}
           <div className="bg-white border border-slate-100 rounded-2xl shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -368,15 +347,10 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
                 <tbody className="divide-y divide-slate-50 text-xs">
                   {filteredStudents.map((student) => {
                     const stats = studentStats[student.id] || { gpa: 10, totalAbsences: 0, unjustifiedAbsences: 0, tardyCount: 0 };
-                    
-                    let statusColor = 'bg-emerald-50 text-emerald-600 border border-emerald-100';
-                    if (student.status === 'Régulier') statusColor = 'bg-sky-50 text-sky-600 border border-sky-100';
-                    if (student.status === 'En progression') statusColor = 'bg-[#B9DDF5]/40 text-slate-800 border border-[#83C5F1]/30';
-                    if (student.status === 'Irrégulier') statusColor = 'bg-amber-50 text-amber-600 border border-amber-100';
-                    if (student.status === 'À risque') statusColor = 'bg-rose-50 text-rose-500 border border-rose-100 animate-pulse';
+                    const { variant, pulse } = getStudentStatusVariant(student.status);
 
                     return (
-                      <tr 
+                      <tr
                         key={student.id}
                         id={`student-row-${student.id}`}
                         onClick={() => onSelectStudent(student.id)}
@@ -384,8 +358,9 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
                       >
                         <td className="p-4 pl-6 flex items-center gap-3">
                           <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-bold text-[#5EA8DA] font-sans">
-                            {student.firstName.charAt(0)}{student.lastName.charAt(0)}
+                            {(student.firstName || '?').charAt(0)}{(student.lastName || '?').charAt(0)}
                           </div>
+
                           <div>
                             <div className="font-bold text-slate-800 font-sans hover:text-[#5EA8DA]">{student.firstName} {student.lastName}</div>
                             <div className="text-[10px] text-slate-400">{student.email}</div>
@@ -405,9 +380,9 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
                           <span className="font-semibold">{stats.tardyCount}</span>
                         </td>
                         <td className="p-4 text-right pr-6">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-tight uppercase leading-none ${statusColor}`}>
+                          <Badge variant={variant} pulse={pulse}>
                             {student.status}
-                          </span>
+                          </Badge>
                         </td>
                       </tr>
                     );
@@ -428,4 +403,4 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
     </div>
     </DataLoader>
   );
-};
+}

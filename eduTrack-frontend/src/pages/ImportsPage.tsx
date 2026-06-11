@@ -1,22 +1,11 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React, { useState, useRef } from 'react';
-import {
-  Upload,
-  History,
-  HelpCircle,
-  FileCheck2,
-  Brush,
-} from 'lucide-react';
-import { uploadImportFile } from '../api/academicApi';
-import { getBaseUrl } from '../api/client';
+import { useState, useRef } from 'react';
+import { Upload, History, HelpCircle, FileCheck2, Brush } from 'lucide-react';
+import { uploadImportFile } from '../services/academicApi';
+import { getBaseUrl } from '../services/apiClient';
 import { useImportLogs } from '../hooks/useAcademicData';
-import { DataLoader } from './DataLoader';
+import { DataLoader } from '../components/DataLoader';
 
-interface ImportsSectionProps {
+interface ImportsPageProps {
   refreshKey?: number;
   onImportSuccess?: () => void;
 }
@@ -32,15 +21,13 @@ const API_IMPORT_TYPE_MAP = {
 
 type ImportType = keyof typeof API_IMPORT_TYPE_MAP;
 
-export const ImportsSection: React.FC<ImportsSectionProps> = ({
-  refreshKey = 0,
-  onImportSuccess,
-}) => {
+/** File import pipeline with drag-and-drop upload and import history. */
+export function ImportsPage({ refreshKey = 0, onImportSuccess }: ImportsPageProps) {
   const { data: importHistory, loading, error, refetch } = useImportLogs(refreshKey);
   const [activeImportType, setActiveImportType] = useState<ImportType>('students');
-  const [dragActive, setDragActive] = useState<boolean>(false);
+  const [dragActive, setDragActive] = useState(false);
   const [pipelineLogs, setPipelineLogs] = useState<string[]>([]);
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [statResult, setStatResult] = useState<{ count: number } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -61,7 +48,7 @@ export const ImportsSection: React.FC<ImportsSectionProps> = ({
       refetch();
       onImportSuccess?.();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erreur lors de l\'import API.';
+      const message = err instanceof Error ? err.message : "Erreur lors de l'import API.";
       setPipelineLogs((prev) => [...prev, `[Échec-API] ${message}`]);
     } finally {
       setIsProcessing(false);
@@ -98,9 +85,7 @@ export const ImportsSection: React.FC<ImportsSectionProps> = ({
       <div id="imports-section" className="space-y-6 animate-fade-in">
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-bold text-slate-800 font-sans">
-              Pipeline d&apos;Importation
-            </h2>
+            <h2 className="text-xl font-bold text-slate-800 font-sans">Pipeline d&apos;Importation</h2>
             <p className="text-slate-500 text-xs mt-1 font-sans">
               Les fichiers sont envoyés au backend et stockés dans votre base de données.
             </p>
@@ -256,4 +241,4 @@ export const ImportsSection: React.FC<ImportsSectionProps> = ({
       </div>
     </DataLoader>
   );
-};
+}

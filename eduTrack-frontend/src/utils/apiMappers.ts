@@ -85,11 +85,13 @@ export interface BackendImportLog {
 
 export interface BackendAlert {
   id: number;
-  student_id: number;
-  student_name: string;
-  type_alerte: string;
-  description: string;
-  date_generation: string;
+  nom: string;
+  prenom: string;
+  classe?: string | null;
+  moyenne: number;
+  nombre_absences: number;
+  risk_level: string;
+  recommandation: string;
 }
 
 export interface BackendOverview {
@@ -126,6 +128,14 @@ export interface BackendScatterPoint {
   statut: string;
 }
 
+export interface BackendModuleStat {
+  module_name: string;
+  moyenne: number;
+  mediane: number;
+  ecart_type: number;
+  taux_echec: number;
+}
+
 const STATUS_MAP: Record<string, Student['status']> = {
   Actif: 'Régulier',
   Excellent: 'Excellent',
@@ -147,7 +157,8 @@ function mapStudentStatus(statut: string): Student['status'] {
   return STATUS_MAP[statut] ?? 'Régulier';
 }
 
-function mapAlertType(typeAlerte: string): AcademicAlert['type'] {
+function mapAlertType(typeAlerte: any): AcademicAlert['type'] {
+  if (!typeAlerte || typeof typeAlerte !== 'string') return 'PERFORMANCE_DROP';
   const normalized = typeAlerte.toLowerCase();
   if (normalized.includes('absence')) return 'ABSENCE';
   if (normalized.includes('retard')) return 'TARDY';
@@ -158,8 +169,8 @@ function mapAlertType(typeAlerte: string): AcademicAlert['type'] {
 export function mapBackendStudent(raw: BackendStudent): Student {
   return {
     id: String(raw.id),
-    firstName: raw.prenom,
-    lastName: raw.nom,
+    firstName: raw.prenom || '',
+    lastName: raw.nom || '',
     className: raw.classe ?? 'Non assigné',
     email: raw.email ?? '',
     createdAt: raw.annee_entree ? `${raw.annee_entree}-09-01` : new Date().toISOString().split('T')[0],
@@ -221,7 +232,7 @@ export function mapBackendRetard(raw: BackendRetard): Tardy {
 }
 
 export function mapBackendImportLog(raw: BackendImportLog): ImportLog {
-  const typeKey = raw.type_donnees?.toLowerCase() ?? 'students';
+  const typeKey = (raw.type_donnees && typeof raw.type_donnees === 'string') ? raw.type_donnees.toLowerCase() : 'students';
   return {
     id: `IMP-${raw.id}`,
     timestamp: new Date(raw.date_import).toLocaleString('fr-FR'),
@@ -234,14 +245,17 @@ export function mapBackendImportLog(raw: BackendImportLog): ImportLog {
 }
 
 export function mapBackendAlert(raw: BackendAlert): AcademicAlert {
+  const title = (raw.risk_level && typeof raw.risk_level === 'string') 
+    ? raw.risk_level.charAt(0).toUpperCase() + raw.risk_level.slice(1) 
+    : 'Alerte';
   return {
     id: String(raw.id),
-    studentId: String(raw.student_id),
-    type: mapAlertType(raw.type_alerte),
-    severity: 'moyenne',
-    title: raw.type_alerte,
-    message: raw.description || `Alerte pour ${raw.student_name}`,
-    date: raw.date_generation?.split('T')[0] ?? new Date().toISOString().split('T')[0],
+    studentId: String(raw.id),
+    type: mapAlertType(raw.risk_level),
+    severity: raw.risk_level === 'critique' ? 'haute' : 'moyenne',
+    title: title,
+    message: raw.recommandation,
+    date: new Date().toISOString().split('T')[0],
     status: 'active',
   };
 }

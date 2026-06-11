@@ -1,24 +1,21 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import { useState, useCallback, useEffect } from 'react';
-import { getBaseUrl, setBaseUrl, getToken, logout } from './api/client';
-import { pingApi } from './api/academicApi';
+import { getBaseUrl, setBaseUrl, getToken } from './services/apiClient';
+import { pingApi } from './services/academicApi';
 import { useAlerts } from './hooks/useAcademicData';
 import { Navigation, TabId } from './components/Navigation';
-import { OverviewSection } from './components/OverviewSection';
-import { ImportsSection } from './components/ImportsSection';
-import { AnalyticsSection } from './components/AnalyticsSection';
-import { StudentsSection } from './components/StudentsSection';
-import { AlertsSection } from './components/AlertsSection';
-import { ReportsSection } from './components/ReportsSection';
-import { ApiConfigTab } from './components/ApiConfigTab';
-import { LoginSection } from './components/LoginSection';
+import { LoadingSpinner } from './components/LoadingSpinner';
+import { OverviewPage } from './pages/OverviewPage';
+import { ImportsPage } from './pages/ImportsPage';
+import { AnalyticsPage } from './pages/AnalyticsPage';
+import { StudentsPage } from './pages/StudentsPage';
+import { AlertsPage } from './pages/AlertsPage';
+import { ReportsPage } from './pages/ReportsPage';
+import { ApiConfigPage } from './pages/ApiConfigPage';
+import { LoginPage } from './pages/LoginPage';
 
 type ApiMode = 'online' | 'offline';
 
+/** Root application shell with auth gate, sidebar navigation, and tab routing. */
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
@@ -31,7 +28,6 @@ export default function App() {
 
   const { data: alerts, refetch: refetchAlerts } = useAlerts(refreshKey);
 
-  // Connection safety: Sync with backend on boot and whenever settings change
   useEffect(() => {
     const syncWithBackend = async () => {
       setIsInitializing(true);
@@ -65,17 +61,16 @@ export default function App() {
 
   if (isInitializing) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-[#5EA8DA] border-t-transparent rounded-full animate-spin" />
-          <p className="text-slate-500 font-medium animate-pulse">Initialisation de la synchronisation...</p>
-        </div>
-      </div>
+      <LoadingSpinner
+        fullScreen
+        size="lg"
+        message="Initialisation de la synchronisation..."
+      />
     );
   }
 
   if (!isAuthenticated) {
-    return <LoginSection onLoginSuccess={() => setIsAuthenticated(true)} />;
+    return <LoginPage onLoginSuccess={() => setIsAuthenticated(true)} />;
   }
 
   return (
@@ -99,7 +94,7 @@ export default function App() {
                 <div className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
                 <p className="text-sm font-semibold">Le serveur backend est actuellement injoignable.</p>
               </div>
-              <button 
+              <button
                 onClick={() => setActiveTab('api-link')}
                 className="text-xs font-bold text-rose-600 hover:text-rose-800 underline"
               >
@@ -109,17 +104,17 @@ export default function App() {
           )}
 
           {activeTab === 'overview' && (
-            <OverviewSection refreshKey={refreshKey} onViewStudent={handleViewStudentFile} />
+            <OverviewPage refreshKey={refreshKey} onViewStudent={handleViewStudentFile} />
           )}
 
           {activeTab === 'imports' && (
-            <ImportsSection refreshKey={refreshKey} onImportSuccess={handleRefresh} />
+            <ImportsPage refreshKey={refreshKey} onImportSuccess={handleRefresh} />
           )}
 
-          {activeTab === 'analytics' && <AnalyticsSection refreshKey={refreshKey} />}
+          {activeTab === 'analytics' && <AnalyticsPage refreshKey={refreshKey} />}
 
           {activeTab === 'students' && (
-            <StudentsSection
+            <StudentsPage
               refreshKey={refreshKey}
               selectedStudentId={selectedStudentId}
               onSelectStudent={setSelectedStudentId}
@@ -127,15 +122,15 @@ export default function App() {
           )}
 
           {activeTab === 'alerts' && (
-            <AlertsSection refreshKey={refreshKey} onViewStudent={handleViewStudentFile} />
+            <AlertsPage refreshKey={refreshKey} onViewStudent={handleViewStudentFile} />
           )}
 
-          {activeTab === 'reports' && <ReportsSection refreshKey={refreshKey} />}
+          {activeTab === 'reports' && <ReportsPage refreshKey={refreshKey} />}
 
           {activeTab === 'api-link' && (
-            <ApiConfigTab 
-              apiUrl={apiUrl} 
-              onUrlChange={handleUrlChange} 
+            <ApiConfigPage
+              apiUrl={apiUrl}
+              onUrlChange={handleUrlChange}
               apiMode={apiMode}
               onModeChange={setApiMode}
             />

@@ -1,23 +1,17 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React from 'react';
+import { ReactNode } from 'react';
+import { LoadingSpinner } from './LoadingSpinner';
 
 interface DataLoaderProps {
   loading: boolean;
   error: string | null;
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
-export const DataLoader: React.FC<DataLoaderProps> = ({ loading, error, children }) => {
+/** Wraps page content with loading spinner and API error display states. */
+export function DataLoader({ loading, error, children }: DataLoaderProps) {
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3">
-        <span className="w-8 h-8 border-2 border-[#5EA8DA] border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-slate-500 font-sans">Chargement des données depuis la base...</p>
-      </div>
+      <LoadingSpinner message="Chargement des données depuis la base..." />
     );
   }
 
@@ -31,4 +25,4 @@ export const DataLoader: React.FC<DataLoaderProps> = ({ loading, error, children
   }
 
   return <>{children}</>;
-};
+}

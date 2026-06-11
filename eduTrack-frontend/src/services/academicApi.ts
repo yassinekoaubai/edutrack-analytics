@@ -1,8 +1,3 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import {
   Student,
   Module,
@@ -23,6 +18,7 @@ import {
   BackendGradeBucket,
   BackendImportLog,
   BackendModule,
+  BackendModuleStat,
   BackendNote,
   BackendOverview,
   BackendRetard,
@@ -37,7 +33,7 @@ import {
   mapBackendRetard,
   mapBackendStudent,
 } from '../utils/apiMappers';
-import { apiClient, getBaseUrl } from './client';
+import { apiClient, getBaseUrl } from './apiClient';
 
 export async function pingApi(url?: string): Promise<boolean> {
   try {
@@ -91,6 +87,11 @@ export async function getImportLogs(): Promise<ImportLog[]> {
 
 export async function getOverview(): Promise<BackendOverview> {
   const { data } = await apiClient.get<BackendOverview>('/dashboard/overview');
+  return data;
+}
+
+export async function getModuleStats(): Promise<BackendModuleStat[]> {
+  const { data } = await apiClient.get<BackendModuleStat[]>('/dashboard/modules/stats');
   return data;
 }
 

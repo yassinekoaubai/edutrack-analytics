@@ -1,35 +1,25 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+import { useState, useEffect } from 'react';
+import { pingApi } from '../services/academicApi';
+import { getBaseUrl, setBaseUrl } from '../services/apiClient';
+import { Database, CheckCircle2, AlertCircle, Save, Link } from 'lucide-react';
 
-import React, { useState, useEffect } from 'react';
-import { pingApi } from '../api/academicApi';
-import { getBaseUrl, setBaseUrl } from '../api/client';
-import {
-  Database,
-  CheckCircle2,
-  AlertCircle,
-  Save,
-  Link,
-} from 'lucide-react';
-
-interface ApiConfigTabProps {
+interface ApiConfigPageProps {
   apiUrl: string;
   onUrlChange: (url: string) => void;
   apiMode: 'online' | 'offline';
   onModeChange: (mode: 'online' | 'offline') => void;
 }
 
-export const ApiConfigTab: React.FC<ApiConfigTabProps> = ({ 
-  apiUrl, 
+/** API connection settings with ping test and online/offline mode toggle. */
+export function ApiConfigPage({
+  apiUrl,
   onUrlChange,
   apiMode,
-  onModeChange
-}) => {
-  const [baseUrlInput, setBaseUrlInput] = useState<string>(apiUrl);
+  onModeChange,
+}: ApiConfigPageProps) {
+  const [baseUrlInput, setBaseUrlInput] = useState(apiUrl);
   const [pingStatus, setPingStatus] = useState<'unchecked' | 'testing' | 'success' | 'failed'>('unchecked');
-  const [saveToast, setSaveToast] = useState<boolean>(false);
+  const [saveToast, setSaveToast] = useState(false);
 
   useEffect(() => {
     setBaseUrlInput(apiUrl);
@@ -49,7 +39,7 @@ export const ApiConfigTab: React.FC<ApiConfigTabProps> = ({
   };
 
   return (
-    <div id="api-config-tab animate-fade-in" className="space-y-6">
+    <div id="api-config-tab" className="space-y-6 animate-fade-in">
       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs flex justify-between items-center">
         <div>
           <h2 className="text-xl font-bold text-slate-800 font-sans">
@@ -175,4 +165,4 @@ export const ApiConfigTab: React.FC<ApiConfigTabProps> = ({
       )}
     </div>
   );
-};
+}

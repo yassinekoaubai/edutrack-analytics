@@ -1,50 +1,40 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React, { useMemo, useState } from 'react';
-import { StudentStats, computeAllStudentStats, computeDescriptiveStats } from '../utils/dataEngine';
+import { useMemo, useState } from 'react';
+import { StudentStats, computeAllStudentStats } from '../utils/dataEngine';
 import { useReportsData } from '../hooks/useAcademicData';
-import { DataLoader } from './DataLoader';
-import { 
-  FileText, 
-  Printer, 
-  Copy, 
-  Check, 
-  Sparkles, 
-  Calendar,
-  Layers,
+import { DataLoader } from '../components/DataLoader';
+import {
+  Printer,
+  Copy,
+  Check,
+  Sparkles,
   FileCheck,
-  TrendingUp,
-  Award
+  Award,
 } from 'lucide-react';
 
-interface ReportsSectionProps {
+interface ReportsPageProps {
   refreshKey?: number;
 }
 
-export const ReportsSection: React.FC<ReportsSectionProps> = ({ refreshKey = 0 }) => {
-  const { students, modules, grades, absences, tardiness, alerts, loading, error } =
+/** Academic report generator with KPIs, class stats, and HTML export. */
+export function ReportsPage({ refreshKey = 0 }: ReportsPageProps) {
+  const { students, grades, absences, tardiness, alerts, loading, error } =
     useReportsData(refreshKey);
   const [copied, setCopied] = useState(false);
   const [reportTitle, setReportTitle] = useState('Rapport Pédagogique du Trimestre 1');
 
-  // Compute overall stats
   const studentStats = useMemo(() => {
     return computeAllStudentStats(students, grades, absences, tardiness);
   }, [students, grades, absences, tardiness]);
 
   const statsList = Object.values(studentStats) as StudentStats[];
 
-  // Group stats calculations
   const summaryKPIs = useMemo(() => {
     if (statsList.length === 0) return { meanGpa: 0, highestGpa: 0, safeRatio: 100, totalsAbs: 0 };
-    
+
     const gpas = statsList.map(s => s.gpa);
     const meanGpa = gpas.reduce((acc, v) => acc + v, 0) / gpas.length;
     const highestGpa = Math.max(...gpas);
-    
+
     const atRisk = students.filter(s => s.status === 'À risque').length;
     const safeRatio = ((students.length - atRisk) / students.length) * 100;
 
@@ -58,7 +48,6 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ refreshKey = 0 }
     };
   }, [statsList, students, absences]);
 
-  // Aggregate stats by Class
   const classStats = useMemo(() => {
     const classes: Record<string, { sum: number; count: number }> = {};
     Object.keys(studentStats).forEach((studentId) => {
@@ -81,7 +70,6 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ refreshKey = 0 }
     }));
   }, [studentStats, students]);
 
-  // Generate dynamic recommendation insights list
   const generalRecommendations = useMemo(() => {
     const recs: string[] = [];
     if (summaryKPIs.meanGpa < 11.5) {
@@ -102,7 +90,6 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ refreshKey = 0 }
     return recs;
   }, [summaryKPIs, alerts, statsList]);
 
-  // Compile raw HTML for instant copy playboards
   const compiledHtmlString = useMemo(() => {
     return `<!DOCTYPE html>
 <html>
@@ -123,7 +110,7 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ refreshKey = 0 }
     <h1 class="title">${reportTitle}</h1>
     <p style="color: #64748b; font-size: 12px; margin-top: 5px;">Généré automatiquement par EduTrack Analytics | Maroc Ynov Campus</p>
   </div>
-  
+
   <div class="kpi-row">
     <div class="kpi-card" style="background-color: #AFE3F4;">
       <div class="kpi-title">Moyenne Générale</div>
@@ -160,8 +147,7 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ refreshKey = 0 }
   return (
     <DataLoader loading={loading} error={error}>
     <div id="reports-section" className="space-y-6 animate-fade-in pb-12">
-      
-      {/* Intro block */}
+
       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800 font-sans">
@@ -171,7 +157,7 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ refreshKey = 0 }
             Générez des rapports synthétiques PDF ou HTML formatés selon la charte Ynov pour l&apos;inspecteur général ou la direction.
           </p>
         </div>
-        
+
         <div className="flex gap-2">
           <button
             onClick={handleCopyHtml}
@@ -203,14 +189,13 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ refreshKey = 0 }
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Left Columns: Config Title and Main Report Sheet Previews */}
+
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs space-y-4">
             <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest font-sans">
               Paramètres Administrateur
             </h3>
-            
+
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-600 block font-sans">Objet du rapport :</label>
               <input
@@ -224,12 +209,9 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ refreshKey = 0 }
             </div>
           </div>
 
-          {/* Actual Print Sheet Canvas */}
           <div id="report-print-sheet" className="bg-white border border-slate-250 rounded-2xl p-8 shadow-md space-y-6 relative overflow-hidden text-slate-800 print:border-none print:shadow-none font-sans">
-            {/* Stamp Ribbon background */}
             <div className="absolute top-0 right-0 w-36 h-36 bg-[#AFE3F4]/15 rounded-full blur-2xl pointer-events-none" />
 
-            {/* School Header */}
             <div className="border-b-2 border-[#5EA8DA] pb-5 flex justify-between items-start">
               <div>
                 <h4 className="text-[10px] tracking-widest font-bold uppercase text-slate-400 font-sans">DOCUMENT INTERNE • YNOV CAMPUS</h4>
@@ -244,7 +226,6 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ refreshKey = 0 }
               </div>
             </div>
 
-            {/* Print KPIs Row */}
             <div className="grid grid-cols-3 gap-4">
               <div className="p-4 bg-[#AFE3F4]/40 border border-[#AFE3F4]/60 rounded-xl">
                 <span className="text-[9px] uppercase font-mono font-bold text-slate-700">Moyenne Générale</span>
@@ -262,7 +243,6 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ refreshKey = 0 }
               </div>
             </div>
 
-            {/* Comparative class stats */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 font-sans flex items-center gap-1.5 border-b border-slate-150 pb-1 w-full">
                 <Award className="w-4 h-4 text-[#83C5F1]" />
@@ -284,7 +264,6 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ refreshKey = 0 }
               </div>
             </div>
 
-            {/* Recommendations Sheet block */}
             <div className="space-y-3 pt-2">
               <h4 className="text-xs font-black uppercase tracking-wider text-slate-550 border-b border-slate-150 pb-1 font-sans flex items-center gap-1.5">
                 <FileCheck className="w-4 h-4 text-emerald-500" />
@@ -300,7 +279,6 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ refreshKey = 0 }
               </div>
             </div>
 
-            {/* Print footer stamp */}
             <div className="pt-6 border-t border-slate-150 flex justify-between items-center text-[10px] text-slate-400 font-mono">
               <span>Maroc Ynov Campus - Département DATA</span>
               <span>Visa de validation administrative</span>
@@ -309,14 +287,13 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ refreshKey = 0 }
           </div>
         </div>
 
-        {/* Right Info pane */}
         <div className="space-y-6">
           <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs space-y-3">
             <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider font-sans flex items-center gap-1.5">
               <Sparkles className="w-4 h-4 text-sky-500" />
               <span>Génération de Rapports</span>
             </h3>
-            
+
             <p className="text-[11.5px] text-slate-500 leading-normal font-sans">
               Notre outil compile des KPIs réels (moyennes, coefficients scolaires, quotas d&apos;absences) calculés en temps réel d&apos;après les fiches d&apos;importation locales et distantes.
             </p>
@@ -332,4 +309,4 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ refreshKey = 0 }
     </div>
     </DataLoader>
   );
-};
+}

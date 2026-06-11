@@ -1,19 +1,15 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React, { useState } from 'react';
-import { login } from '../api/academicApi';
-import { setToken } from '../api/client';
+import { useState } from 'react';
+import { login } from '../services/academicApi';
+import { setToken } from '../services/apiClient';
 import { Lock, Mail, AlertCircle, LogIn, GraduationCap } from 'lucide-react';
 import { AuthToken } from '../types';
 
-interface LoginSectionProps {
+interface LoginPageProps {
   onLoginSuccess: (auth: AuthToken) => void;
 }
 
-export const LoginSection: React.FC<LoginSectionProps> = ({ onLoginSuccess }) => {
+/** Staff login form with JWT authentication against the backend API. */
+export function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,16 +23,18 @@ export const LoginSection: React.FC<LoginSectionProps> = ({ onLoginSuccess }) =>
     try {
       const data = await login({ email, password });
       setToken(data.access_token);
-      // Store user details too
-      localStorage.setItem('edutrack_user_v1', JSON.stringify({
-        id: data.user_id,
-        role: data.role,
-        nom: data.nom,
-        prenom: data.prenom
-      }));
+      localStorage.setItem(
+        'edutrack_user_v1',
+        JSON.stringify({
+          id: data.user_id,
+          role: data.role,
+          nom: data.nom,
+          prenom: data.prenom,
+        })
+      );
       onLoginSuccess(data);
-    } catch (err: any) {
-      setError(err.message || "Erreur d'authentification");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur d'authentification");
     } finally {
       setLoading(false);
     }
@@ -131,4 +129,4 @@ export const LoginSection: React.FC<LoginSectionProps> = ({ onLoginSuccess }) =>
       </div>
     </div>
   );
-};
+}

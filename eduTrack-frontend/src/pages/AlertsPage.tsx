@@ -1,51 +1,38 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { AcademicAlert } from '../types';
 import { computeAllStudentStats, evaluateMLModel } from '../utils/dataEngine';
 import { useAlertsData } from '../hooks/useAcademicData';
-import { DataLoader } from './DataLoader';
-import { 
-  BellRing, 
-  Settings2, 
-  ShieldAlert, 
-  TrendingUp, 
-  TrendingDown, 
-  HelpCircle,
+import { DataLoader } from '../components/DataLoader';
+import {
+  BellRing,
+  Settings2,
+  ShieldAlert,
   Activity,
-  UserCheck2,
-  BookmarkCheck
 } from 'lucide-react';
 
-interface AlertsSectionProps {
+interface AlertsPageProps {
   refreshKey?: number;
   onViewStudent: (studentId: string) => void;
 }
 
-export const AlertsSection: React.FC<AlertsSectionProps> = ({
+/** Configurable academic alerts with ML model metrics and confusion matrix. */
+export function AlertsPage({
   refreshKey = 0,
   onViewStudent,
-}) => {
+}: AlertsPageProps) {
   const { students, grades, absences, tardiness, loading, error } = useAlertsData(refreshKey);
-  // Configurable alert parameters
   const [gpaThreshold, setGpaThreshold] = useState<number>(10.0);
   const [absenceThreshold, setAbsenceThreshold] = useState<number>(8);
-  const [predictorSensitivity, setPredictorSensitivity] = useState<number>(45); // Risk probability trigger cutoff (0-100)
+  const [predictorSensitivity, setPredictorSensitivity] = useState<number>(45);
 
-  // Compute stats
   const studentStats = useMemo(() => {
     return computeAllStudentStats(students, grades, absences, tardiness);
   }, [students, grades, absences, tardiness]);
 
-  // Execute ML prediction evaluation dashboard calculations
   const mlMetrics = useMemo(() => {
     return evaluateMLModel(students, studentStats, predictorSensitivity, gpaThreshold, absenceThreshold);
   }, [students, studentStats, predictorSensitivity, gpaThreshold, absenceThreshold]);
 
-  // Filter alerts based on threshold changes on the fly
   const customAlerts = useMemo(() => {
     const alertsList: AcademicAlert[] = [];
     let idCounter = 1;
@@ -88,11 +75,9 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   return (
     <DataLoader loading={loading} error={error}>
     <div id="alerts-section" className="space-y-6 animate-fade-in">
-      
-      {/* Visual threshold tuning drawer */}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Tuning controls */}
+
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs space-y-5">
           <div className="flex items-center gap-2.5 border-b border-slate-50 pb-3">
             <Settings2 className="w-5 h-5 text-[#5EA8DA]" />
@@ -101,7 +86,6 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
             </h3>
           </div>
 
-          {/* GPA Slider */}
           <div className="space-y-2">
             <div className="flex justify-between items-center text-xs font-bold font-sans">
               <span className="text-slate-600">Note minimale attendue :</span>
@@ -120,7 +104,6 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
             />
           </div>
 
-          {/* Absences Slider */}
           <div className="space-y-2">
             <div className="flex justify-between items-center text-xs font-bold font-sans">
               <span className="text-slate-600">Absences max autorisées :</span>
@@ -139,7 +122,6 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
             />
           </div>
 
-          {/* Model sensitivity Slider */}
           <div className="space-y-2 pt-2 border-t border-slate-50">
             <div className="flex justify-between items-center text-xs font-bold font-sans">
               <span className="text-slate-600">Sensibilité de prédiction :</span>
@@ -163,7 +145,6 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
           </div>
         </div>
 
-        {/* ML Performance Metrics: BONUS A */}
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs flex flex-col justify-between">
           <div className="space-y-3.5">
             <div className="flex items-center justify-between border-b border-slate-50 pb-3">
@@ -206,7 +187,6 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
           </div>
         </div>
 
-        {/* Confusion Matrix Display: BONUS A */}
         <div className="bg-slate-900 text-slate-100 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-3.5">
           <div className="border-b border-slate-800 pb-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-[#AFE3F4] font-mono">
@@ -218,28 +198,24 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-center font-mono text-xs">
-            {/* True Positive (TP) */}
             <div className="p-3 bg-emerald-950/40 border border-emerald-800/60 rounded-xl text-emerald-400 flex flex-col justify-center">
               <span className="text-[8px] uppercase font-bold text-slate-400">Vrais Positifs (TP)</span>
               <span className="text-2xl font-black text-white mt-1">{mlMetrics.confusionMatrix.tp}</span>
               <span className="text-[8px] text-emerald-500/80 mt-0.5">Signalé & Réel En Danger</span>
             </div>
 
-            {/* False Negative (FN) */}
             <div className="p-3 bg-rose-950/40 border border-rose-900/40 rounded-xl text-rose-400 flex flex-col justify-center">
               <span className="text-[8px] uppercase font-bold text-slate-400">Faux Négatifs (FN)</span>
               <span className="text-2xl font-black text-white mt-1">{mlMetrics.confusionMatrix.fn}</span>
               <span className="text-[8px] text-rose-500/80 mt-0.5">Sains mais Réel En Danger</span>
             </div>
 
-            {/* False Positive (FP) */}
             <div className="p-3 bg-amber-950/40 border border-amber-900/40 rounded-xl text-amber-400 flex flex-col justify-center">
               <span className="text-[8px] uppercase font-bold text-slate-400">Faux Positifs (FP)</span>
               <span className="text-2xl font-black text-white mt-1">{mlMetrics.confusionMatrix.fp}</span>
               <span className="text-[8px] text-amber-500/80 mt-0.5">Signalé mais En Sécurité</span>
             </div>
 
-            {/* True Negative (TN) */}
             <div className="p-3 bg-slate-800/30 border border-slate-700/60 rounded-xl text-slate-400 flex flex-col justify-center">
               <span className="text-[8px] uppercase font-bold text-slate-400">Vrais Négatifs (TN)</span>
               <span className="text-2xl font-black text-white mt-1">{mlMetrics.confusionMatrix.tn}</span>
@@ -250,7 +226,6 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
 
       </div>
 
-      {/* Segment tracking warning active list */}
       <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-xs space-y-4">
         <div className="flex justify-between items-center border-b border-slate-50 pb-3">
           <div className="flex items-center gap-2">
@@ -270,12 +245,12 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
             const isCritical = alt.severity === 'haute';
 
             return (
-              <div 
+              <div
                 key={alt.id}
                 onClick={() => onViewStudent(alt.studentId)}
                 className={`p-4 border rounded-2xl flex items-start gap-4 hover:shadow-xs hover:border-slate-300 transition-all cursor-pointer group ${
-                  isCritical 
-                    ? 'border-rose-100 bg-rose-50/20' 
+                  isCritical
+                    ? 'border-rose-100 bg-rose-50/20'
                     : 'border-amber-100 bg-amber-50/20'
                 }`}
               >
@@ -296,7 +271,7 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
                       {alt.type}
                     </span>
                   </div>
-                  
+
                   <p className="text-[11px] text-slate-500 font-sans leading-relaxed">
                     {alt.message}
                   </p>
@@ -323,4 +298,4 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
     </div>
     </DataLoader>
   );
-};
+}

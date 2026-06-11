@@ -14,7 +14,7 @@ import {
   ImportLog,
   AcademicAlert,
 } from '../types';
-import * as academicApi from '../api/academicApi';
+import * as academicApi from '../services/academicApi';
 import { BackendOverview } from '../utils/apiMappers';
 
 interface FetchState<T> {
@@ -127,6 +127,10 @@ export function useGradeDistribution(refreshKey = 0) {
   return useFetch(academicApi.getGradeDistribution, [], refreshKey);
 }
 
+export function useModuleStats(refreshKey = 0) {
+  return useFetch(academicApi.getModuleStats, [], refreshKey);
+}
+
 export function useScatterData(refreshKey = 0) {
   return useFetch(academicApi.getScatterData, [], refreshKey);
 }
@@ -135,6 +139,7 @@ export function useDashboardOverview(refreshKey = 0) {
   const overview = useOverview(refreshKey);
   const classComparison = useClassComparison(refreshKey);
   const gradeDistribution = useGradeDistribution(refreshKey);
+  const moduleStats = useModuleStats(refreshKey);
   const scatter = useScatterData(refreshKey);
   const alerts = useAlerts(refreshKey);
 
@@ -142,12 +147,14 @@ export function useDashboardOverview(refreshKey = 0) {
     overview.loading ||
     classComparison.loading ||
     gradeDistribution.loading ||
+    moduleStats.loading ||
     scatter.loading ||
     alerts.loading;
   const error =
     overview.error ||
     classComparison.error ||
     gradeDistribution.error ||
+    moduleStats.error ||
     scatter.error ||
     alerts.error;
 
@@ -155,6 +162,7 @@ export function useDashboardOverview(refreshKey = 0) {
     overview: overview.data,
     classComparison: classComparison.data,
     gradeDistribution: gradeDistribution.data,
+    moduleStats: moduleStats.data,
     scatter: scatter.data,
     alerts: alerts.data,
     loading,

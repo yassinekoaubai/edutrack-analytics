@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from db.session import init_db
 from api import imports, dashboards, students, alerts, academic, auth
+from utils.seed import seed_database
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -15,6 +16,11 @@ app = FastAPI(
     description="Plateforme d'Analyse de Performance des Étudiants (Maroc Ynov Campus)",
     version="1.0.0"
 )
+
+@app.on_event("startup")
+def on_startup():
+    seed_database()
+
 
 _cors_origins = os.getenv(
     "CORS_ORIGINS",

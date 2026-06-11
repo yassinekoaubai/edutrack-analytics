@@ -1,18 +1,10 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useDashboardOverview } from '../hooks/useAcademicData';
-import { DataLoader } from './DataLoader';
-import {
-  TrendingUp,
-  AlertTriangle,
-  Calendar,
-  Clock,
-  BookOpen,
-} from 'lucide-react';
+import { DataLoader } from '../components/DataLoader';
+import { StatCard } from '../components/StatCard';
+import { ModuleSuccessRateChart } from '../components/charts/ModuleSuccessRateChart';
+import { RiskLevelPieChart } from '../components/charts/RiskLevelPieChart';
+import { TrendingUp, AlertTriangle, Calendar, Clock, BookOpen } from 'lucide-react';
 
 const BUCKET_COLORS: Record<string, string> = {
   '[0-8)': '#F4DBE3',
@@ -25,7 +17,8 @@ const BUCKET_COLORS: Record<string, string> = {
 
 const BAR_COLORS = ['bg-[#5EA8DA]', 'bg-[#83C5F1]', 'bg-[#AFE3F4]'];
 
-function mapStatutColor(statut: string): string {
+function mapStatutColor(statut: string | null | undefined): string {
+  if (!statut || typeof statut !== 'string') return '#0EA5E9';
   const s = statut.toLowerCase();
   if (s.includes('excellent')) return '#10B981';
   if (s.includes('irrégulier') || s.includes('irregulier')) return '#F59E0B';
@@ -34,16 +27,14 @@ function mapStatutColor(statut: string): string {
   return '#0EA5E9';
 }
 
-interface OverviewSectionProps {
+interface OverviewPageProps {
   refreshKey?: number;
   onViewStudent: (studentId: string) => void;
 }
 
-export const OverviewSection: React.FC<OverviewSectionProps> = ({
-  refreshKey = 0,
-  onViewStudent,
-}) => {
-  const { overview, classComparison, gradeDistribution, scatter, alerts, loading, error } =
+/** Dashboard overview with KPIs, charts, and active alerts from the API. */
+export function OverviewPage({ refreshKey = 0, onViewStudent }: OverviewPageProps) {
+  const { overview, classComparison, gradeDistribution, moduleStats, scatter, alerts, loading, error } =
     useDashboardOverview(refreshKey);
 
   const [hoveredPoint, setHoveredPoint] = useState<{
@@ -96,65 +87,74 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-xs relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1.5 bg-[#83C5F1]" />
-                <p className="text-slate-500 text-xs uppercase tracking-wider font-bold font-sans">Moyenne Générale</p>
-                <h3 className="text-3xl font-extrabold text-slate-900 mt-2 font-mono">
-                  {overview.moyenne_generale}
-                  <span className="text-sm font-medium text-slate-400">/20</span>
-                </h3>
-                <div className="mt-4 flex items-center gap-2 text-xs text-slate-500 font-sans">
-                  <TrendingUp className="w-3.5 h-3.5" />
-                  <span>{overview.total_students} étudiant(s) en base</span>
-                </div>
-              </div>
-
-              <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-xs relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1.5 bg-[#AFE3F4]" />
-                <p className="text-slate-500 text-xs uppercase tracking-wider font-bold font-sans">Taux de Réussite</p>
-                <h3 className="text-3xl font-extrabold text-slate-900 mt-2 font-mono">
-                  {overview.taux_reussite}
-                  <span className="text-sm font-medium text-slate-400">%</span>
-                </h3>
-                <div className="mt-4 flex items-center gap-2 text-xs font-sans">
-                  <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="font-semibold text-emerald-600 font-mono">
-                    {overview.students_passing}/{overview.total_students}
-                  </span>
-                  <span className="text-slate-500">élèves avec moyenne ≥ 10</span>
-                </div>
-              </div>
-
-              <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-xs relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1.5 bg-[#B9DDF5]" />
-                <p className="text-slate-500 text-xs uppercase tracking-wider font-bold font-sans">Absences Moyennes</p>
-                <h3 className="text-3xl font-extrabold text-slate-900 mt-2 font-mono">
-                  {overview.taux_absence}
-                  <span className="text-sm font-medium text-slate-400">h</span>
-                </h3>
-                <div className="mt-4 flex items-center gap-2 text-xs font-sans">
-                  <Clock className="w-3.5 h-3.5 text-amber-600" />
-                  <span className="font-semibold text-amber-600 font-mono">
-                    {overview.unjustified_absences}
-                  </span>
-                  <span className="text-slate-500">absences non-justifiées</span>
-                </div>
-              </div>
-
-              <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-xs relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1.5 bg-[#F4DBE3]" />
-                <p className="text-slate-500 text-xs uppercase tracking-wider font-bold font-sans">Étudiants à Risque</p>
-                <h3 className="text-3xl font-extrabold text-slate-900 mt-2 font-mono">
-                  {overview.nombre_etudiants_a_risque}
-                </h3>
-                <div className="mt-4 flex items-center gap-2 text-xs font-sans">
-                  <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
-                  <span className="font-semibold text-rose-600 font-mono">
-                    {overview.critical_alerts}
-                  </span>
-                  <span className="text-slate-500">alertes actives</span>
-                </div>
-              </div>
+              <StatCard
+                label="Moyenne Générale"
+                accentColor="#83C5F1"
+                value={
+                  <>
+                    {overview.moyenne_generale}
+                    <span className="text-sm font-medium text-slate-400">/20</span>
+                  </>
+                }
+                footer={
+                  <>
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    <span>{overview.total_students} étudiant(s) en base</span>
+                  </>
+                }
+              />
+              <StatCard
+                label="Taux de Réussite"
+                accentColor="#AFE3F4"
+                value={
+                  <>
+                    {overview.taux_reussite}
+                    <span className="text-sm font-medium text-slate-400">%</span>
+                  </>
+                }
+                footer={
+                  <>
+                    <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="font-semibold text-emerald-600 font-mono">
+                      {overview.students_passing}/{overview.total_students}
+                    </span>
+                    <span className="text-slate-500">élèves avec moyenne ≥ 10</span>
+                  </>
+                }
+              />
+              <StatCard
+                label="Absences Moyennes"
+                accentColor="#B9DDF5"
+                value={
+                  <>
+                    {overview.taux_absence}
+                    <span className="text-sm font-medium text-slate-400">h</span>
+                  </>
+                }
+                footer={
+                  <>
+                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                    <span className="font-semibold text-amber-600 font-mono">
+                      {overview.unjustified_absences}
+                    </span>
+                    <span className="text-slate-500">absences non-justifiées</span>
+                  </>
+                }
+              />
+              <StatCard
+                label="Étudiants à Risque"
+                accentColor="#F4DBE3"
+                value={overview.nombre_etudiants_a_risque}
+                footer={
+                  <>
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+                    <span className="font-semibold text-rose-600 font-mono">
+                      {overview.critical_alerts}
+                    </span>
+                    <span className="text-slate-500">alertes actives</span>
+                  </>
+                }
+              />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -245,6 +245,11 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
               </div>
             </div>
 
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <ModuleSuccessRateChart data={moduleStats} />
+              <RiskLevelPieChart alerts={alerts} totalStudents={overview.total_students} />
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-xs lg:col-span-2">
                 <h3 className="text-base font-bold text-slate-800 font-sans">Distribution des Moyennes Générales</h3>
@@ -307,4 +312,4 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
       </div>
     </DataLoader>
   );
-};
+}

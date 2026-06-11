@@ -1,51 +1,39 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   computeAllStudentStats,
   computeDescriptiveStats,
   runKMeansClustering,
-  ClusterPoint,
-  ClusterCentroid
 } from '../utils/dataEngine';
 import { useAnalyticsData } from '../hooks/useAcademicData';
-import { DataLoader } from './DataLoader';
-import { 
-  BarChart2, 
-  Sigma, 
-  HelpCircle, 
-  Sparkles, 
-  Play, 
-  TrendingUp, 
-  ArrowRight,
-  Info
+import { DataLoader } from '../components/DataLoader';
+import {
+  BarChart2,
+  Sigma,
+  Sparkles,
+  TrendingUp,
+  Info,
 } from 'lucide-react';
 
-interface AnalyticsSectionProps {
+interface AnalyticsPageProps {
   refreshKey?: number;
 }
 
-export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ refreshKey = 0 }) => {
+/** Exploratory stats and K-Means student segmentation dashboard. */
+export function AnalyticsPage({ refreshKey = 0 }: AnalyticsPageProps) {
   const { students, modules, grades, absences, tardiness, loading, error } = useAnalyticsData(refreshKey);
   const [activeSubTab, setActiveSubTab] = useState<'stats' | 'clustering'>('stats');
   const [kmeansIterations, setKmeansIterations] = useState<number>(6);
   const [selectedClusterIdx, setSelectedClusterIdx] = useState<number | null>(null);
 
-  // Compute stats
   const studentStats = useMemo(() => {
     return computeAllStudentStats(students, grades, absences, tardiness);
   }, [students, grades, absences, tardiness]);
 
-  // Descriptive stats per module
   const moduleStats = useMemo(() => {
     return modules.map((mod) => {
       const modGrades = grades.filter((g) => g.moduleId === mod.id).map((g) => g.score);
       const stats = computeDescriptiveStats(modGrades);
-      
-      // Calculate failure rate (grades < 10)
+
       const failures = modGrades.filter((score) => score < 10).length;
       const failureRate = modGrades.length > 0 ? (failures / modGrades.length) * 100 : 0;
 
@@ -58,7 +46,6 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ refreshKey =
     });
   }, [modules, grades]);
 
-  // Execute clustering
   const clusteringResult = useMemo(() => {
     return runKMeansClustering(students, studentStats, kmeansIterations);
   }, [students, studentStats, kmeansIterations]);
@@ -66,8 +53,7 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ refreshKey =
   return (
     <DataLoader loading={loading} error={error}>
     <div id="analytics-section" className="space-y-6 animate-fade-in">
-      
-      {/* Tab bar header */}
+
       <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-3xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex gap-2">
           <button
@@ -100,8 +86,7 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ refreshKey =
 
       {activeSubTab === 'stats' ? (
         <div className="space-y-6 animate-fade-in">
-          
-          {/* Module statistical table */}
+
           <div className="bg-white rounded-2xl border border-slate-100 shadow-xs overflow-hidden">
             <div className="p-6 border-b border-slate-50 flex items-center justify-between">
               <div>
@@ -109,7 +94,7 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ refreshKey =
                   Statistiques Éducatives Exploratoires (EDA)
                 </h3>
                 <p className="text-slate-400 text-xs font-sans mt-0.5">
-                  Indicateurs détaillés par matière (moyenne, médiane, écart-type, quartiles) 
+                  Indicateurs détaillés par matière (moyenne, médiane, écart-type, quartiles)
                 </p>
               </div>
               <Sigma className="w-6 h-6 text-[#5EA8DA]" />
@@ -161,7 +146,6 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ refreshKey =
             </div>
           </div>
 
-          {/* Descriptive callouts */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs flex gap-4">
               <div className="p-3 bg-indigo-50 text-indigo-500 rounded-xl h-fit">
@@ -191,8 +175,7 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ refreshKey =
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in pb-12">
-          
-          {/* Controls Column */}
+
           <div className="space-y-6">
             <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs space-y-4">
               <div>
@@ -204,7 +187,6 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ refreshKey =
                 </p>
               </div>
 
-              {/* Dynamic iterative slides */}
               <div className="space-y-2">
                 <label className="text-xs text-slate-600 font-bold block font-sans">
                   Itérations de convergence: {kmeansIterations}
@@ -253,8 +235,8 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ refreshKey =
                         key={idx}
                         onClick={() => setSelectedClusterIdx(isSelected ? null : idx)}
                         className={`w-full text-[11px] font-semibold flex items-center justify-between p-2 rounded-lg border text-left cursor-pointer transition-all ${
-                          isSelected 
-                            ? 'ring-2 ring-slate-900 font-extrabold scale-[1.01]' 
+                          isSelected
+                            ? 'ring-2 ring-slate-900 font-extrabold scale-[1.01]'
                             : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700'
                         }`}
                       >
@@ -273,10 +255,8 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ refreshKey =
             </div>
           </div>
 
-          {/* Interactive Chart & Mathematical details columns */}
           <div className="lg:col-span-2 space-y-6">
-            
-            {/* Clustering SVG Plane */}
+
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs relative">
               <div className="flex justify-between items-center mb-4">
                 <div>
@@ -292,10 +272,8 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ refreshKey =
                 </div>
               </div>
 
-              {/* SVG 2D Canvas */}
               <div className="relative h-72 border-b border-l border-slate-200 pl-4 pb-2 bg-slate-50/20 rounded-lg">
                 <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible">
-                  {/* Grid spacing */}
                   <line x1="20" y1="5" x2="20" y2="95" stroke="#f1f5f9" strokeWidth="0.5" />
                   <line x1="40" y1="5" x2="40" y2="95" stroke="#f1f5f9" strokeWidth="0.5" />
                   <line x1="60" y1="5" x2="60" y2="95" stroke="#f1f5f9" strokeWidth="0.5" />
@@ -305,10 +283,9 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ refreshKey =
                   <line x1="5" y1="60" x2="95" y2="60" stroke="#f1f5f9" strokeWidth="0.5" />
                   <line x1="5" y1="80" x2="95" y2="80" stroke="#f1f5f9" strokeWidth="0.5" />
 
-                  {/* Draw points */}
                   {clusteringResult.points.map((pt) => {
                     const isFading = selectedClusterIdx !== null && pt.clusterIndex !== selectedClusterIdx;
-                    
+
                     const pColors = ['#22D3EE', '#38BDF8', '#93C5FD', '#1E40AF', '#FDA4AF'];
                     const color = pColors[pt.clusterIndex % pColors.length];
 
@@ -327,7 +304,6 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ refreshKey =
                     );
                   })}
 
-                  {/* Draw Centroids as giant crosses */}
                   {clusteringResult.centroids.map((centroid, idx) => {
                     const isFading = selectedClusterIdx !== null && idx !== selectedClusterIdx;
                     const cColors = ['#0891B2', '#0284C7', '#2563EB', '#1e293b', '#E11D48'];
@@ -338,13 +314,12 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ refreshKey =
 
                     return (
                       <g key={idx} opacity={isFading ? 0.2 : 1} className="transition-all duration-300">
-                        {/* Centroid icon marker */}
                         <circle cx={cx} cy={cy} r="5" fill={color} stroke="#ffffff" strokeWidth="1" />
                         <line x1={cx - 5} y1={cy} x2={cx + 5} y2={cy} stroke="#ffffff" strokeWidth="1" />
                         <line x1={cx} y1={cy - 5} x2={cx} y2={cy + 5} stroke="#ffffff" strokeWidth="1" />
-                        <text 
-                          x={cx + 7} 
-                          y={cy + 3} 
+                        <text
+                          x={cx + 7}
+                          y={cy + 3}
                           className="font-mono font-bold text-[5px] fill-slate-800"
                         >
                           {centroid.label}
@@ -354,7 +329,6 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ refreshKey =
                   })}
                 </svg>
 
-                {/* Legend axes labels */}
                 <div className="absolute left-1 bottom-1 text-[8px] font-mono text-slate-400 select-none">
                   Absences cumulées (0-20h)
                 </div>
@@ -364,7 +338,6 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ refreshKey =
               </div>
             </div>
 
-            {/* Display names belonging to the selected cluster list */}
             {selectedClusterIdx !== null && (
               <div className="bg-white p-5 rounded-2xl border border-slate-150 shadow-md animate-slide-up">
                 <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-3">
@@ -402,4 +375,4 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ refreshKey =
     </div>
     </DataLoader>
   );
-};
+}
