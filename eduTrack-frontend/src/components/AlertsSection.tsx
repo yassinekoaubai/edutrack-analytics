@@ -4,8 +4,10 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { Student, AcademicAlert } from '../types';
+import { AcademicAlert } from '../types';
 import { computeAllStudentStats, evaluateMLModel } from '../utils/dataEngine';
+import { useAlertsData } from '../hooks/useAcademicData';
+import { DataLoader } from './DataLoader';
 import { 
   BellRing, 
   Settings2, 
@@ -19,24 +21,15 @@ import {
 } from 'lucide-react';
 
 interface AlertsSectionProps {
-  students: Student[];
-  grades: any[];
-  absences: any[];
-  tardiness: any[];
-  activeAlerts: AcademicAlert[];
-  onSetAlerts: (alerts: AcademicAlert[]) => void;
+  refreshKey?: number;
   onViewStudent: (studentId: string) => void;
 }
 
 export const AlertsSection: React.FC<AlertsSectionProps> = ({
-  students,
-  grades,
-  absences,
-  tardiness,
-  activeAlerts,
-  onSetAlerts,
-  onViewStudent
+  refreshKey = 0,
+  onViewStudent,
 }) => {
+  const { students, grades, absences, tardiness, loading, error } = useAlertsData(refreshKey);
   // Configurable alert parameters
   const [gpaThreshold, setGpaThreshold] = useState<number>(10.0);
   const [absenceThreshold, setAbsenceThreshold] = useState<number>(8);
@@ -93,6 +86,7 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   }, [studentStats, students, gpaThreshold, absenceThreshold]);
 
   return (
+    <DataLoader loading={loading} error={error}>
     <div id="alerts-section" className="space-y-6 animate-fade-in">
       
       {/* Visual threshold tuning drawer */}
@@ -327,5 +321,6 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
       </div>
 
     </div>
+    </DataLoader>
   );
 };

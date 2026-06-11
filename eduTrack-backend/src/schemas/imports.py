@@ -115,3 +115,16 @@ class RetardImportRow(BaseModel):
         if v == '' or v == 'N/A' or v == 'nan':
             return None
         return v
+
+class FiliereImportRow(BaseModel):
+    id: Optional[Any] = None
+    nom_filiere: Any
+    departement: Optional[Any] = None
+
+class ClasseImportRow(BaseModel):
+    id: Optional[Any] = None
+    nom: Any
+    niveau: Optional[Any] = None
+    annee_scolaire: Optional[Any] = None
+    id_filiere: Optional[Any] = None
+    nom_filiere: Optional[Any] = None

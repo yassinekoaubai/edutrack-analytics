@@ -4,8 +4,9 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { Student, Grade, Absence, Tardy, Module, Evaluation } from '../types';
 import { computeAllStudentStats, predictFailureRiskScore } from '../utils/dataEngine';
+import { useStudentsData, useStudentProfile } from '../hooks/useAcademicData';
+import { DataLoader } from './DataLoader';
 import { 
   Search, 
   Filter, 
@@ -24,31 +25,25 @@ import {
 } from 'lucide-react';
 
 interface StudentsSectionProps {
-  students: Student[];
-  modules: Module[];
-  grades: Grade[];
-  absences: Absence[];
-  tardiness: Tardy[];
-  evaluations: Evaluation[];
+  refreshKey?: number;
   selectedStudentId: string | null;
   onSelectStudent: (id: string | null) => void;
 }
 
 export const StudentsSection: React.FC<StudentsSectionProps> = ({
-  students,
-  modules,
-  grades,
-  absences,
-  tardiness,
-  evaluations,
+  refreshKey = 0,
   selectedStudentId,
-  onSelectStudent
+  onSelectStudent,
 }) => {
+  const { students, modules, grades, absences, tardiness, evaluations, loading: listLoading, error: listError } =
+    useStudentsData(refreshKey);
+  const { data: profileData, loading: profileLoading, error: profileError } = useStudentProfile(selectedStudentId, refreshKey);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [classFilter, setClassFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  // Compute stats
+  // Compute stats for the list
   const studentStats = useMemo(() => {
     return computeAllStudentStats(students, grades, absences, tardiness);
   }, [students, grades, absences, tardiness]);
@@ -68,84 +63,60 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
     });
   }, [students, searchQuery, classFilter, statusFilter]);
 
-  // Detailed selected student data
+  // Detailed selected student data (Now using backend data)
   const studentProfile = useMemo(() => {
-    if (!selectedStudentId) return null;
+    if (!profileData) return null;
 
-    const student = students.find((s) => s.id === selectedStudentId);
-    if (!student) return null;
+    // We still need the base student object for names/etc if not fully in profileData
+    // But profileData from backend (EtudiantRead) should have everything
+    const stats = studentStats[String(profileData.id)] || {
+      gpa: 0,
+      totalAbsences: profileData.absences_count || 0,
+      unjustifiedAbsences: profileData.absences_count || 0,
+      tardyCount: profileData.retards_count || 0,
+      gpaTrend: 0,
+      rank: profileData.classement || 0
+    };
 
-    const stats = studentStats[student.id];
-    
-    // Modules list with computed mean grades for this student
-    const studentGrades = grades.filter((g) => g.studentId === student.id);
-    const studentAbsences = absences.filter((a) => a.studentId === student.id);
-    const studentTardies = tardiness.filter((t) => t.studentId === student.id);
+    // Use risk score from backend if available
+    const failureRiskScore = profileData.risk_score ?? predictFailureRiskScore(stats, 10, 8);
 
-    const moduleReport = modules.map((mod) => {
-      const modGrades = studentGrades.filter((g) => g.moduleId === mod.id);
-      let points = 0;
-      let coefsSum = 0;
-
-      modGrades.forEach((g) => {
-        points += g.score * g.coefficient;
-        coefsSum += g.coefficient;
-      });
-
-      const avg = coefsSum > 0 ? points / coefsSum : null;
-      const hoursAbsent = studentAbsences.filter((a) => a.moduleId === mod.id).reduce((acc, curr) => acc + curr.hours, 0);
-
-      return {
-        ...mod,
-        grades: modGrades,
-        avg: avg !== null ? Math.round(avg * 100) / 100 : null,
-        hoursAbsent
-      };
-    });
-
-    const failureRiskScore = stats ? predictFailureRiskScore(stats, 10, 8) : 0;
-
-    // Generate smart pedagogical recommendations matching details
+    // Generate recommendations
     const recommendations: string[] = [];
-    if (stats) {
-      if (stats.gpa < 10) {
-        recommendations.push("⚠️ Moyenne globale sous la barre d'admission (10/20). Planifier une séance de remédiation académique d'urgence.");
-      }
-      if (stats.totalAbsences > 6) {
-        recommendations.push("🛑 Seuil critique d'absences dépassé. Convoquer l'étudiant pour signature d'une charte d'assiduité éducative.");
-      }
-      if (stats.tardyCount >= 3) {
-        recommendations.push("⏱️ Retards récurrents constatés. Rappel administratif pour corriger la ponctualité aux cours du matin.");
-      }
-      
-      // Module specific alerts
-      moduleReport.forEach((m) => {
-        if (m.avg !== null && m.avg < 10) {
-          recommendations.push(`📚 Renforcer l'accompagnement sur le module "${m.name}" (Moyenne actuelle: ${m.avg}/20). Recommander un binôme de tutorat avec un élève "Excellent".`);
+    if (profileData.notes) {
+      profileData.notes.forEach(n => {
+        if (n.valeur !== null && n.valeur < 10) {
+          recommendations.push(`📚 Renforcer l'accompagnement sur le module "${n.module}" (Moyenne actuelle: ${n.valeur}/20).`);
         }
       });
-
-      if (stats.gpaTrend < -1.5) {
-        recommendations.push("📈 Diminution des résultats constatée entre les devoirs de contrôle et l'examen final. Conseiller un encadrement méthodologique d'examen.");
-      }
-
-      if (recommendations.length === 0) {
-        recommendations.push("🌟 Excellence académique et assiduité remarquable. Inviter l'étudiant à participer en tant que tuteur bénévole pour les élèves fragiles.");
-      }
+    }
+    
+    if (stats.gpa < 10) recommendations.push("⚠️ Moyenne globale sous la barre d'admission (10/20).");
+    if (stats.totalAbsences > 6) recommendations.push("🛑 Seuil critique d'absences dépassé.");
+    
+    if (recommendations.length === 0) {
+      recommendations.push("🌟 Excellence académique et assiduité remarquable.");
     }
 
     return {
-      student,
+      student: {
+        id: String(profileData.id),
+        firstName: profileData.prenom,
+        lastName: profileData.nom,
+        email: profileData.email || "",
+        className: profileData.classe || "Non assigné",
+      },
       stats,
-      moduleReport,
-      absences: studentAbsences,
-      tardies: studentTardies,
+      notes: profileData.notes || [],
+      absencesCount: profileData.absences_count || 0,
+      retardsCount: profileData.retards_count || 0,
       failureRiskScore,
       recommendations
     };
-  }, [selectedStudentId, students, modules, grades, absences, tardiness, studentStats]);
+  }, [profileData, studentStats]);
 
   return (
+    <DataLoader loading={listLoading || (!!selectedStudentId && profileLoading)} error={listError || profileError}>
     <div id="students-section" className="space-y-6 animate-fade-in">
 
       {selectedStudentId && studentProfile ? (
@@ -213,7 +184,7 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
                     <Clock className="w-4 h-4 text-slate-400" />
                     <div>
                       <span className="text-[9px] text-slate-400 block font-bold font-sans">ABSENCES</span>
-                      <span className="text-xs font-mono font-bold text-slate-700">{studentProfile.stats?.totalAbsences || 0}h</span>
+                      <span className="text-xs font-mono font-bold text-slate-700">{studentProfile.absencesCount}h</span>
                     </div>
                   </div>
 
@@ -221,7 +192,7 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
                     <Clock className="w-4 h-4 text-slate-400" />
                     <div>
                       <span className="text-[9px] text-slate-400 block font-bold font-sans">RETARDS</span>
-                      <span className="text-xs font-mono font-bold text-slate-700">{studentProfile.stats?.tardyCount || 0} éven.</span>
+                      <span className="text-xs font-mono font-bold text-slate-700">{studentProfile.retardsCount} éven.</span>
                     </div>
                   </div>
                 </div>
@@ -270,44 +241,30 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
                 </div>
 
                 <div className="divide-y divide-slate-100 text-xs">
-                  {studentProfile.moduleReport.map((m) => {
-                    const hasGrades = m.grades.length > 0;
-                    const valCol = m.avg !== null && m.avg >= 10 ? 'text-emerald-700' : 'text-rose-600';
+                  {studentProfile.notes.map((n, idx) => {
+                    const valCol = n.valeur !== null && n.valeur >= 10 ? 'text-emerald-700' : 'text-rose-600';
 
                     return (
-                      <div key={m.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/50 transition-colors">
+                      <div key={idx} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/50 transition-colors">
                         <div>
-                          <div className="font-semibold text-slate-800 font-sans">{m.name}</div>
-                          <div className="text-[10px] text-slate-400 font-sans">Professeur: {m.professor}</div>
+                          <div className="font-semibold text-slate-800 font-sans">{n.module}</div>
+                          <div className="text-[10px] text-slate-400 font-sans">Dernière évaluation enregistrée</div>
                         </div>
 
                         <div className="flex items-center gap-6">
-                          <div className="flex gap-2">
-                            {m.grades.map((g) => {
-                              const ev = evaluations.find(e => e.id === g.evaluationId);
-                              return (
-                                <span 
-                                  key={g.id} 
-                                  title={ev?.name || 'Évaluation'}
-                                  className="font-mono text-[10.5px] bg-slate-100 border border-slate-200/50 text-slate-600 px-2 py-1 rounded"
-                                >
-                                  {ev?.name.includes('CC') ? 'CC' : 'Final'}: <strong className="text-slate-800">{g.score}</strong>
-                                </span>
-                              );
-                            })}
-                            {!hasGrades && <span className="text-slate-300 italic">Aucune note</span>}
-                          </div>
-
                           <div className="border-l border-slate-150 pl-4 text-right min-w-[70px]">
                             <span className="text-[9px] text-slate-400 block font-bold font-sans">MOYENNE</span>
                             <span className={`font-mono font-extrabold text-sm ${valCol}`}>
-                              {m.avg !== null ? `${m.avg}/20` : '—'}
+                              {n.valeur !== null ? `${n.valeur}/20` : '—'}
                             </span>
                           </div>
                         </div>
                       </div>
                     );
                   })}
+                  {studentProfile.notes.length === 0 && (
+                    <div className="p-8 text-center text-slate-400 italic">Aucune note enregistrée pour cet étudiant.</div>
+                  )}
                 </div>
               </div>
 
@@ -469,5 +426,6 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
       )}
 
     </div>
+    </DataLoader>
   );
 };

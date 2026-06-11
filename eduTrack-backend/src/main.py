@@ -3,7 +3,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from db.session import init_db
-from api import imports, dashboards, students, alerts
+from api import imports, dashboards, students, alerts, academic, auth
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -30,10 +30,12 @@ app.add_middleware(
 )
 
 # Registering endpoints cleanly
+app.include_router(auth.router)
 app.include_router(imports.router)
 app.include_router(dashboards.router, prefix="/dashboard", tags=["Dashboard KPIs"])
 app.include_router(students.router, prefix="/students", tags=["Students Profiles"])
 app.include_router(alerts.router, prefix="/alerts", tags=["Pedagogical Alerts"])
+app.include_router(academic.router, tags=["Academic Data"])
 
 @app.get("/")
 def root_redirect():

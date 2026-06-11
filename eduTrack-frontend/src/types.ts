@@ -96,3 +96,17 @@ export interface APIConfig {
   baseUrl: string;
   mode: 'offline' | 'online';
 }
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface AuthToken {
+  access_token: string;
+  token_type: string;
+  user_id: number;
+  role: string;
+  nom: string;
+  prenom: string;
+}

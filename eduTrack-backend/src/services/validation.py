@@ -203,6 +203,35 @@ def validate_absence_df(df: pd.DataFrame, session: Session) -> Tuple[List[Absenc
 
     return validated, errors
 
+def validate_filiere_df(df: pd.DataFrame) -> Tuple[List[dict], List[str]]:
+    validated = []
+    errors = []
+    for idx, row in df.iterrows():
+        try:
+            data = row.to_dict()
+            if not data.get('nom_filiere'):
+                raise ValueError("Nom de filière manquant")
+            validated.append(data)
+        except Exception as e:
+            errors.append(f"Ligne {idx + 2}: {str(e)}")
+    return validated, errors
+
+def validate_classe_df(df: pd.DataFrame, valid_filiere_ids: Set[int]) -> Tuple[List[dict], List[str]]:
+    validated = []
+    errors = []
+    for idx, row in df.iterrows():
+        try:
+            data = row.to_dict()
+            if not data.get('nom'):
+                raise ValueError("Nom de classe manquant")
+            if data.get('id_filiere') is not None:
+                if int(data['id_filiere']) not in valid_filiere_ids:
+                    raise ValueError(f"ID Filiere {data['id_filiere']} inconnu")
+            validated.append(data)
+        except Exception as e:
+            errors.append(f"Ligne {idx + 2}: {str(e)}")
+    return validated, errors
+
 def validate_retard_df(df: pd.DataFrame, session: Session) -> Tuple[List[RetardCreate], List[str]]:
     validated = []
     errors = []

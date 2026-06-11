@@ -7,11 +7,11 @@ import enum
 
 # ---------- ENUM ROLE ----------
 class RoleEnum(str, enum.Enum):
-    ADMIN = "admin"
-    DIRECTION = "direction"
-    PROF = "prof"
-    PEDAGOGIE = "pedagogie"
-    ACCUEIL = "accueil"
+    ADMIN = "ADMIN"
+    DIRECTION = "DIRECTION"
+    PROF = "PROF"
+    PEDAGOGIE = "PEDAGOGIE"
+    ACCUEIL = "ACCUEIL"
 
 # ---------- 1. FILIERE ----------
 class Filiere(SQLModel, table=True):
@@ -146,14 +146,7 @@ class Retard(SQLModel, table=True):
     etudiant: Etudiant = Relationship(back_populates="retards")
     module: Module = Relationship(back_populates="retards")
 
-# ---------- 11. ROLE (pour auth) ----------
-
-class Role(SQLModel, table=True):
-    __tablename__ = "roles"
-    id: Optional[int] = Field(default=None, primary_key=True)
-    description: Optional[str] = None
-
-# ---------- 12. UTILISATEUR (staff uniquement) ----------
+# ---------- 11. UTILISATEUR (staff uniquement) ----------
 class Utilisateur(SQLModel, table=True):
     __tablename__ = "utilisateurs"
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -161,6 +154,7 @@ class Utilisateur(SQLModel, table=True):
     prenom: str = Field(max_length=50)
     email: str = Field(max_length=120, unique=True, index=True)
     password_hash: str
+    role: RoleEnum = Field(default=RoleEnum.PROF)
     actif: bool = True
     date_creation: datetime = Field(default_factory=datetime.utcnow)
     derniere_connexion: Optional[datetime] = None
@@ -169,7 +163,7 @@ class Utilisateur(SQLModel, table=True):
     imports: List["ImportLog"] = Relationship(back_populates="auteur")
     alertes_traitees: List["Alerte"] = Relationship(back_populates="traite_par")
 
-# ---------- 13. UTILISATEUR_MODULE ----------
+# ---------- 12. UTILISATEUR_MODULE ----------
 class UtilisateurModule(SQLModel, table=True):
     __tablename__ = "utilisateurs_modules"
     id_utilisateur: int = Field(foreign_key="utilisateurs.id", primary_key=True)
@@ -179,7 +173,7 @@ class UtilisateurModule(SQLModel, table=True):
     utilisateur: Utilisateur = Relationship(back_populates="modules_enseignes")
     module: Module = Relationship(back_populates="profs")
 
-# ---------- 14. IMPORT_LOG ----------
+# ---------- 13. IMPORT_LOG ----------
 class ImportLog(SQLModel, table=True):
     __tablename__ = "import_logs"
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -193,7 +187,7 @@ class ImportLog(SQLModel, table=True):
 
     auteur: Optional[Utilisateur] = Relationship(back_populates="imports")
 
-# ---------- 15. PARAMETRE_RISQUE ----------
+# ---------- 14. PARAMETRE_RISQUE ----------
 class ParametreRisque(SQLModel, table=True):
     __tablename__ = "parametres_risque"
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -204,7 +198,7 @@ class ParametreRisque(SQLModel, table=True):
 
     alertes: List["Alerte"] = Relationship(back_populates="parametre")
 
-# ---------- 16. ALERTE ----------
+# ---------- 15. ALERTE ----------
 class Alerte(SQLModel, table=True):
     __tablename__ = "alertes"
     id: Optional[int] = Field(default=None, primary_key=True)

@@ -10,10 +10,46 @@ from services.etl import (
     process_evaluation_import,
     process_note_import,
     process_absence_import,
-    process_retard_import   
+    process_retard_import,
+    process_filiere_import,
+    process_classe_import
 )
 
 router = APIRouter(prefix="/imports", tags=["import"])
+
+@router.post("/filieres", response_model=ImportResult)
+async def upload_filieres(
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session)
+):
+    try:
+        content = await file.read()
+        if file.filename.endswith('.csv'):
+            df = pd.read_csv(BytesIO(content), sep=None, engine='python', encoding='utf-8', on_bad_lines='warn')
+        else:
+            df = pd.read_excel(BytesIO(content))
+    except Exception as e:
+        raise HTTPException(400, f"Fichier illisible: {e}")
+
+    result = process_filiere_import(df, file.filename, session)
+    return result
+
+@router.post("/classes", response_model=ImportResult)
+async def upload_classes(
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session)
+):
+    try:
+        content = await file.read()
+        if file.filename.endswith('.csv'):
+            df = pd.read_csv(BytesIO(content), sep=None, engine='python', encoding='utf-8', on_bad_lines='warn')
+        else:
+            df = pd.read_excel(BytesIO(content))
+    except Exception as e:
+        raise HTTPException(400, f"Fichier illisible: {e}")
+
+    result = process_classe_import(df, file.filename, session)
+    return result
 
 @router.post("/etudiants", response_model=ImportResult)
 async def upload_etudiants(

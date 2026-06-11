@@ -3,9 +3,11 @@ from sqlalchemy.orm import Session
 from typing import List
 from db.session import get_session as get_db
 from db import models
-from schemas.etudiant import EtudiantListItem, EtudiantRead
+from schemas.etudiant import EtudiantBase, EtudiantRead, EtudiantListItem
+from services.analysis import predict_risk_score
 
 router = APIRouter()
+
 
 @router.get("/", response_model=List[EtudiantListItem])
 def get_students(skip: int = 0, limit: int = 500, db: Session = Depends(get_db)):
@@ -63,6 +65,9 @@ def get_student_by_id(id: int, db: Session = Depends(get_db)):
             module_nom = n.evaluation.module.nom
         formatted_notes.append({"module": module_nom, "valeur": n.valeur})
     
+    # Calculate risk score via analysis service
+    risk_score = predict_risk_score(id, db)
+    
     return EtudiantRead(
         id=student.id,
         nom=student.nom,
@@ -73,5 +78,6 @@ def get_student_by_id(id: int, db: Session = Depends(get_db)):
         notes=formatted_notes,
         absences_count=absences,
         retards_count=retards,
-        classement=12 # Placeholder
+        classement=12, # Placeholder
+        risk_score=risk_score
     )

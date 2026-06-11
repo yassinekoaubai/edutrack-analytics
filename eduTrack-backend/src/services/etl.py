@@ -1,257 +1,189 @@
-from .validation import validate_etudiant_df, validate_module_df, validate_evaluation_df, validate_note_df, validate_absence_df, validate_retard_df
-from .cleaning import clean_etudiant_df, clean_module_df, clean_evaluation_df, clean_note_df, clean_absence_df, clean_retard_df
-from db.models import Etudiant, ImportLog, Module, Evaluation, Note, Absence, Retard
+from .validation import (
+    validate_etudiant_df, validate_module_df, validate_evaluation_df, 
+    validate_note_df, validate_absence_df, validate_retard_df,
+    validate_filiere_df, validate_classe_df
+)
+from .cleaning import (
+    clean_etudiant_df, clean_module_df, clean_evaluation_df, 
+    clean_note_df, clean_absence_df, clean_retard_df,
+    clean_filiere_df, clean_classe_df
+)
+from .analysis import run_alert_detection
+from db.models import Etudiant, ImportLog, Module, Evaluation, Note, Absence, Retard, Filiere, Classe
 from schemas.imports import ModuleImportRow, ImportResult
 from schemas.module import ModuleCreate
 from sqlmodel import Session, select
 import pandas as pd
+from sqlalchemy.dialects.postgresql import insert
 
 def process_etudiant_import(df: pd.DataFrame, filename: str, session: Session) -> ImportResult:
-    # 1. Cleaning
     df = clean_etudiant_df(df)
-
-    # 2. Validation
     validated_students, errors = validate_etudiant_df(df)
-
-    # 3. Insert BDD
     nb_ok = 0
     for student_data in validated_students:
         try:
-            db_student = Etudiant.model_validate(student_data)
-            session.add(db_student)
+            # Upsert on email
+            stmt = insert(Etudiant).values(student_data.model_dump())
+            stmt = stmt.on_conflict_do_update(
+                index_elements=['email'],
+                set_={
+                    'nom': stmt.excluded.nom,
+                    'prenom': stmt.excluded.prenom,
+                    'statut': stmt.excluded.statut,
+                    'annee_entree': stmt.excluded.annee_entree,
+                    'date_naissance': stmt.excluded.date_naissance
+                }
+            )
+            session.execute(stmt)
             nb_ok += 1
-        except Exception:
-            errors.append(f"Erreur DB pour {student_data.email}")
-
+        except Exception as e:
+            errors.append(f"Erreur DB pour {student_data.email}: {e}")
     session.commit()
-
-    # 4. Historique des imports - Section 2.1
-    log = ImportLog(
-        nom_fichier=filename,
-        type_donnees="etudiants",
-        nb_lignes_ok=nb_ok,
-        nb_lignes_rejet=len(errors),
-        statut="Terminé"
-    )
+    log = ImportLog(nom_fichier=filename, type_donnees="etudiants", nb_lignes_ok=nb_ok, nb_lignes_rejet=len(errors), statut="Terminé")
     session.add(log)
     session.commit()
-
-    return ImportResult(
-        nb_lignes_ok=nb_ok,
-        nb_lignes_rejet=len(errors),
-        erreurs=errors[:10],
-        message="Import terminé"
-    )
+    try:
+        run_alert_detection(session)
+    except Exception as e:
+        print(f"WARNING: Alert detection failed: {e}")
+    return ImportResult(nb_lignes_ok=nb_ok, nb_lignes_rejet=len(errors), erreurs=errors[:10], message="Import terminé")
 
 def process_module_import(df: pd.DataFrame, filename: str, session: Session) -> ImportResult:
-    # 1. Cleaning - Section 2.1
     df = clean_module_df(df)
-
-    # 2. Validation - Même pattern que etudiants
     validated_modules, errors = validate_module_df(df)
-
-    # 3. Insert BDD
     nb_ok = 0
     for module_data in validated_modules:
         try:
-            db_module = Module.model_validate(module_data)
-            session.add(db_module)
+            # Upsert on nom (assuming unique or logic)
+            existing = session.exec(select(Module).where(Module.nom == module_data.nom)).first()
+            if existing:
+                existing.nombre_horaire = module_data.nombre_horaire
+                existing.seuil_validation = module_data.seuil_validation
+            else:
+                session.add(Module.model_validate(module_data))
             nb_ok += 1
         except Exception:
             errors.append(f"Erreur DB pour {module_data.nom}")
-
     session.commit()
-
-    # 4. Historique des imports - Section 2.1
-    log = ImportLog(
-        nom_fichier=filename,
-        type_donnees="modules",
-        nb_lignes_ok=nb_ok,
-        nb_lignes_rejet=len(errors),
-        statut="Terminé"
-    )
+    log = ImportLog(nom_fichier=filename, type_donnees="modules", nb_lignes_ok=nb_ok, nb_lignes_rejet=len(errors), statut="Terminé")
     session.add(log)
     session.commit()
-
-    return ImportResult(
-        nb_lignes_ok=nb_ok,
-        nb_lignes_rejet=len(errors),
-        erreurs=errors[:10],
-        message="Import terminé"
-    )
+    return ImportResult(nb_lignes_ok=nb_ok, nb_lignes_rejet=len(errors), erreurs=errors[:10], message="Import terminé")
 
 def process_evaluation_import(df: pd.DataFrame, filename: str, session: Session) -> ImportResult:
-    # DEBUG: Check DB modules
     db_modules = session.exec(select(Module)).all()
-    print(f"DEBUG: Found {len(db_modules)} modules in database.")
-    for m in db_modules[:5]:
-        print(f"DEBUG: DB Module: ID={m.id}, Name='{m.nom}'")
-
-    # 1. Cleaning - Section 2.1
-    print(f"DEBUG: Input DF columns: {df.columns.tolist()}")
     df = clean_evaluation_df(df, session)
-    print(f"DEBUG: After cleaning, 'id_module' in DF? {'id_module' in df.columns}")
-    if 'id_module' in df.columns:
-        print(f"DEBUG: id_module head: {df['id_module'].head().tolist()}")
-
-    # 2. Validation - Fetch valid IDs for check
     valid_module_ids = {m.id for m in db_modules}
     validated_evals, errors = validate_evaluation_df(df, valid_module_ids)
-
-    # 3. Insert BDD
     nb_ok = 0
     for eval_data in validated_evals:
         try:
-            db_eval = Evaluation.model_validate(eval_data)
-            session.add(db_eval)
+            session.add(Evaluation.model_validate(eval_data))
             nb_ok += 1
         except Exception as e:
             errors.append(f"Erreur DB pour {eval_data.nom_eval}: {str(e)}")
-
     session.commit()
-
-    # 4. Log
-    log = ImportLog(
-        nom_fichier=filename,
-        type_donnees="evaluations",
-        nb_lignes_ok=nb_ok,
-        nb_lignes_rejet=len(errors),
-        statut="Terminé"
-    )
+    log = ImportLog(nom_fichier=filename, type_donnees="evaluations", nb_lignes_ok=nb_ok, nb_lignes_rejet=len(errors), statut="Terminé")
     session.add(log)
     session.commit()
-
-    return ImportResult(
-        nb_lignes_ok=nb_ok,
-        nb_lignes_rejet=len(errors),
-        erreurs=errors[:10],
-        message="Import terminé"
-    )
-
-from sqlalchemy.dialects.postgresql import insert
-from db.models import Note, ImportLog
+    return ImportResult(nb_lignes_ok=nb_ok, nb_lignes_rejet=len(errors), erreurs=errors[:10], message="Import terminé")
 
 def process_note_import(df: pd.DataFrame, filename: str, session: Session) -> ImportResult:
     df = clean_note_df(df, session)
     validated_notes, errors = validate_note_df(df, session)
-
     nb_ok = 0
-    nb_rejet = len(errors)
-    
     if validated_notes:
-        # Convert to dicts for bulk insert
         values = [n.model_dump() for n in validated_notes]
-        
-        # Build upsert statement
         stmt = insert(Note).values(values)
-        
-        # Update if duplicate (id_etudiant + id_evaluation)
         stmt = stmt.on_conflict_do_update(
             index_elements=['id_etudiant', 'id_evaluation'],
-            set_={
-                'valeur': stmt.excluded.valeur,
-                'date_saisie': stmt.excluded.date_saisie
-            }
+            set_={'valeur': stmt.excluded.valeur, 'date_saisie': stmt.excluded.date_saisie}
         )
-        
         result = session.execute(stmt)
         session.commit()
-        # In PG, rowcount for upsert counts both inserted and updated rows
         nb_ok = max(0, result.rowcount) 
-
-    log = ImportLog(
-        nom_fichier=filename,
-        type_donnees="notes",
-        nb_lignes_ok=nb_ok,
-        nb_lignes_rejet=nb_rejet,
-        statut="Terminé"
-    )
+    log = ImportLog(nom_fichier=filename, type_donnees="notes", nb_lignes_ok=nb_ok, nb_lignes_rejet=len(errors), statut="Terminé")
     session.add(log)
     session.commit()
-
-    return ImportResult(
-        nb_lignes_ok=nb_ok,
-        nb_lignes_rejet=nb_rejet,
-        erreurs=errors[:10],
-        message=f"Import terminé: {nb_ok} lignes traitées (insérées ou mises à jour)"
-    )
+    try:
+        run_alert_detection(session)
+    except Exception as e:
+        print(f"WARNING: Alert detection failed: {e}")
+    return ImportResult(nb_lignes_ok=nb_ok, nb_lignes_rejet=len(errors), erreurs=errors[:10])
 
 def process_absence_import(df: pd.DataFrame, filename: str, session: Session) -> ImportResult:
     df = clean_absence_df(df, session)
-
-    # DEBUG
-    print("=== ABSENCES APRES CLEANING ===")
-    print(df[['id_etudiant', 'id_module', 'date_absence', 'nb_heures', 'justifiee']].head())
-
     validated_absences, errors = validate_absence_df(df, session)
-
     nb_ok = 0
     for absence_data in validated_absences:
         try:
-            db_absence = Absence.model_validate(absence_data)
-            session.add(db_absence)
+            session.add(Absence.model_validate(absence_data))
             nb_ok += 1
         except Exception as e:
             errors.append(f"Erreur DB: {str(e)}")
-
     session.commit()
-
-    log = ImportLog(
-        nom_fichier=filename,
-        type_donnees="absences",
-        nb_lignes_ok=nb_ok,
-        nb_lignes_rejet=len(errors),
-        statut="Terminé"
-    )
+    log = ImportLog(nom_fichier=filename, type_donnees="absences", nb_lignes_ok=nb_ok, nb_lignes_rejet=len(errors), statut="Terminé")
     session.add(log)
     session.commit()
-
-    return ImportResult(
-        nb_lignes_ok=nb_ok,
-        nb_lignes_rejet=len(errors),
-        erreurs=errors[:10],
-        message="Import terminé"
-    )
+    try:
+        run_alert_detection(session)
+    except Exception as e:
+        print(f"WARNING: Alert detection failed: {e}")
+    return ImportResult(nb_lignes_ok=nb_ok, nb_lignes_rejet=len(errors), erreurs=errors[:10])
 
 def process_retard_import(df: pd.DataFrame, filename: str, session: Session) -> ImportResult:
     df = clean_retard_df(df, session)
-
-    print("=== RETARDS APRES CLEANING ===")
-    cols = ['id_etudiant', 'id_module', 'date_retard', 'duree_minutes', 'est_justifie']
-    existing_cols = [c for c in cols if c in df.columns]
-    print(df[existing_cols].head())
-
     validated_retards, errors = validate_retard_df(df, session)
-
     nb_ok = 0
     for retard_data in validated_retards:
         try:
-            db_retard = Retard.model_validate(retard_data)
-            session.add(db_retard)
+            session.add(Retard.model_validate(retard_data))
             nb_ok += 1
         except Exception as e:
-            errors.append(f"Erreur DB ligne {nb_ok + len(errors) + 1}: {str(e)}")
-
-    try:
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        errors.append(f"Erreur commit: {str(e)}")
-        nb_ok = 0
-
-    log = ImportLog(
-        nom_fichier=filename,
-        type_donnees="retards",
-        nb_lignes_ok=nb_ok,
-        nb_lignes_rejet=len(errors),
-        statut="Terminé" if nb_ok > 0 else "Echec"
-    )
+            errors.append(f"Erreur DB: {str(e)}")
+    session.commit()
+    log = ImportLog(nom_fichier=filename, type_donnees="retards", nb_lignes_ok=nb_ok, nb_lignes_rejet=len(errors), statut="Terminé")
     session.add(log)
     session.commit()
+    try:
+        run_alert_detection(session)
+    except Exception as e:
+        print(f"WARNING: Alert detection failed: {e}")
+    return ImportResult(nb_lignes_ok=nb_ok, nb_lignes_rejet=len(errors), erreurs=errors[:10])
 
-    return ImportResult(
-        nb_lignes_ok=nb_ok,
-        nb_lignes_rejet=len(errors),
-        erreurs=errors[:10],
-        message="Import terminé"
-    )
+def process_filiere_import(df: pd.DataFrame, filename: str, session: Session) -> ImportResult:
+    df = clean_filiere_df(df)
+    validated, errors = validate_filiere_df(df)
+    nb_ok = 0
+    for data in validated:
+        try:
+            existing = session.exec(select(Filiere).where(Filiere.nom_filiere == data['nom_filiere'])).first()
+            if existing:
+                for k, v in data.items():
+                    setattr(existing, k, v)
+            else:
+                session.add(Filiere(**data))
+            nb_ok += 1
+        except Exception as e:
+            errors.append(f"Erreur DB: {str(e)}")
+    session.commit()
+    return ImportResult(nb_lignes_ok=nb_ok, nb_lignes_rejet=len(errors), erreurs=errors[:10])
+
+def process_classe_import(df: pd.DataFrame, filename: str, session: Session) -> ImportResult:
+    df = clean_classe_df(df, session)
+    filieres = session.exec(select(Filiere.id)).all()
+    validated, errors = validate_classe_df(df, set(filieres))
+    nb_ok = 0
+    for data in validated:
+        try:
+            existing = session.exec(select(Classe).where(Classe.nom == data['nom'])).first()
+            if existing:
+                for k, v in data.items():
+                    setattr(existing, k, v)
+            else:
+                session.add(Classe(**data))
+            nb_ok += 1
+        except Exception as e:
+            errors.append(f"Erreur DB: {str(e)}")
+    session.commit()
+    return ImportResult(nb_lignes_ok=nb_ok, nb_lignes_rejet=len(errors), erreurs=errors[:10])

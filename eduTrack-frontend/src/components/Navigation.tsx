@@ -14,24 +14,26 @@ import {
   Settings,
   ShieldCheck,
   Zap,
-  RotateCcw
+  RotateCcw,
+  LogOut
 } from 'lucide-react';
+import { logout } from '../api/client';
 
 export type TabId = 'overview' | 'imports' | 'analytics' | 'students' | 'alerts' | 'reports' | 'api-link';
 
 interface NavigationProps {
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
-  apiMode: 'offline' | 'online';
-  onResetData: () => void;
+  apiConnected: boolean;
+  onRefreshData: () => void;
   alertCount: number;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({
   activeTab,
   onTabChange,
-  apiMode,
-  onResetData,
+  apiConnected,
+  onRefreshData,
   alertCount
 }) => {
   const menuItems: Array<{ id: TabId; label: string; icon: any; color: string; badge?: boolean }> = [
@@ -138,25 +140,24 @@ export const Navigation: React.FC<NavigationProps> = ({
         {/* Status Indicator Bar */}
         <div className="flex items-center justify-between px-2">
           <div className="flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${apiMode === 'online' ? 'bg-emerald-500 shadow-[0_0_8px_4px_rgba(16,185,129,0.2)]' : 'bg-amber-500 shadow-[0_0_8px_4px_rgba(245,158,11,0.2)]'}`} />
+            <span className={`w-2.5 h-2.5 rounded-full ${apiConnected ? 'bg-emerald-500 shadow-[0_0_8px_4px_rgba(16,185,129,0.2)]' : 'bg-rose-500 shadow-[0_0_8px_4px_rgba(244,63,94,0.2)]'}`} />
             <span className="text-xs text-slate-300 font-sans tracking-tight">
-              {apiMode === 'online' ? 'Connecté à l\'API' : 'Moteur Simulateur'}
+              {apiConnected ? 'Connecté à l\'API' : 'API indisponible'}
             </span>
           </div>
           <span className="text-[10px] font-mono font-bold text-slate-400 uppercase bg-slate-800 px-1.5 py-0.5 rounded">
-            {apiMode === 'online' ? 'LIVE' : 'LOCAL'}
+            {apiConnected ? 'LIVE' : 'OFF'}
           </span>
         </div>
 
-        {/* Action Button */}
         <button
-          onClick={onResetData}
-          id="btn-reset-data"
+          onClick={onRefreshData}
+          id="btn-refresh-data"
           className="w-full flex items-center justify-center gap-2 py-2 px-3 border border-slate-800 rounded-lg hover:bg-slate-800 hover:border-slate-700 text-xs text-slate-400 hover:text-slate-100 transition-colors cursor-pointer group"
-          title="Réinitialiser les données académiques"
+          title="Rafraîchir les données depuis l'API"
         >
           <RotateCcw className="w-3.5 h-3.5 text-slate-400 group-hover:rotate-45 transition-transform" />
-          <span className="font-sans">Réinitialiser les données</span>
+          <span className="font-sans">Rafraîchir les données</span>
         </button>
       </div>
     </aside>

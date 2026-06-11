@@ -4,14 +4,15 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { Student, Grade, Absence, Tardy, Module } from '../types';
-import { 
-  computeAllStudentStats, 
-  computeDescriptiveStats, 
+import {
+  computeAllStudentStats,
+  computeDescriptiveStats,
   runKMeansClustering,
   ClusterPoint,
   ClusterCentroid
 } from '../utils/dataEngine';
+import { useAnalyticsData } from '../hooks/useAcademicData';
+import { DataLoader } from './DataLoader';
 import { 
   BarChart2, 
   Sigma, 
@@ -24,20 +25,11 @@ import {
 } from 'lucide-react';
 
 interface AnalyticsSectionProps {
-  students: Student[];
-  modules: Module[];
-  grades: Grade[];
-  absences: Absence[];
-  tardiness: Tardy[];
+  refreshKey?: number;
 }
 
-export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
-  students,
-  modules,
-  grades,
-  absences,
-  tardiness
-}) => {
+export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ refreshKey = 0 }) => {
+  const { students, modules, grades, absences, tardiness, loading, error } = useAnalyticsData(refreshKey);
   const [activeSubTab, setActiveSubTab] = useState<'stats' | 'clustering'>('stats');
   const [kmeansIterations, setKmeansIterations] = useState<number>(6);
   const [selectedClusterIdx, setSelectedClusterIdx] = useState<number | null>(null);
@@ -72,6 +64,7 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
   }, [students, studentStats, kmeansIterations]);
 
   return (
+    <DataLoader loading={loading} error={error}>
     <div id="analytics-section" className="space-y-6 animate-fade-in">
       
       {/* Tab bar header */}
@@ -407,5 +400,6 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
       )}
 
     </div>
+    </DataLoader>
   );
 };

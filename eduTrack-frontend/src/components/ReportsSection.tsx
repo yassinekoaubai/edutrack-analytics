@@ -4,8 +4,9 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { Student, Module, Grade, Absence, Tardy, AcademicAlert } from '../types';
 import { StudentStats, computeAllStudentStats, computeDescriptiveStats } from '../utils/dataEngine';
+import { useReportsData } from '../hooks/useAcademicData';
+import { DataLoader } from './DataLoader';
 import { 
   FileText, 
   Printer, 
@@ -20,22 +21,12 @@ import {
 } from 'lucide-react';
 
 interface ReportsSectionProps {
-  students: Student[];
-  modules: Module[];
-  grades: Grade[];
-  absences: Absence[];
-  tardiness: Tardy[];
-  alerts: AcademicAlert[];
+  refreshKey?: number;
 }
 
-export const ReportsSection: React.FC<ReportsSectionProps> = ({
-  students,
-  modules,
-  grades,
-  absences,
-  tardiness,
-  alerts
-}) => {
+export const ReportsSection: React.FC<ReportsSectionProps> = ({ refreshKey = 0 }) => {
+  const { students, modules, grades, absences, tardiness, alerts, loading, error } =
+    useReportsData(refreshKey);
   const [copied, setCopied] = useState(false);
   const [reportTitle, setReportTitle] = useState('Rapport Pédagogique du Trimestre 1');
 
@@ -167,6 +158,7 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({
   };
 
   return (
+    <DataLoader loading={loading} error={error}>
     <div id="reports-section" className="space-y-6 animate-fade-in pb-12">
       
       {/* Intro block */}
@@ -338,5 +330,6 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({
       </div>
 
     </div>
+    </DataLoader>
   );
 };

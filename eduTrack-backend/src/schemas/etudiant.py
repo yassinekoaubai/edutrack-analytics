@@ -37,6 +37,7 @@ class EtudiantRead(EtudiantBase):
     absences_count: Optional[int] = None
     retards_count: Optional[int] = None
     classement: Optional[int] = None
+    risk_score: Optional[float] = None
 
 # --- Relationship Read Schemas ---
 class InscriptionRead(BaseModel):
