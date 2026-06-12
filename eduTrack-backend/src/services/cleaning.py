@@ -1,22 +1,26 @@
-from db.session import Session
-from db.models import Module, Etudiant, Evaluation, Filiere, Classe
-from sqlmodel import select
 import pandas as pd
 import numpy as np
 import unicodedata
 from datetime import datetime, timezone
+from sqlmodel import Session, select
+from models import Module, Etudiant, Filiere, Evaluation
 
 def normalize_string(s: str) -> str:
-    """Normalise une chaîne: minuscule, sans accents, sans espaces superflus."""
+    """
+    Normalizes a string by converting to lowercase, removing accents, and stripping whitespace.
+    Returns: Normalized string.
+    """
     if not isinstance(s, str):
         return ""
-    # Enlever accents
     s = unicodedata.normalize('NFD', s)
     s = "".join([c for c in s if unicodedata.category(c) != 'Mn'])
     return s.strip().lower()
 
 def clean_etudiant_df(df: pd.DataFrame) -> pd.DataFrame:
-    # 1. Normalisation colonnes
+    """
+    Cleans student DataFrame: normalizes columns, removes duplicates, and formats data types.
+    Returns: Cleaned DataFrame.
+    """
     df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_').str.replace('-', '_')
     df = df.rename(columns={
         'e_mail': 'email', 'e-mail': 'email', 'mail': 'email',
@@ -24,11 +28,9 @@ def clean_etudiant_df(df: pd.DataFrame) -> pd.DataFrame:
         'annee_d_entree': 'annee_entree', 'année_entrée': 'annee_entree'
     })
 
-    # 2. Suppression doublons sur email
     if 'email' in df.columns:
         df = df.drop_duplicates(subset=['email'], keep='first')
 
-    # 3. Normalisation strings
     for col in ['nom', 'prenom', 'statut', 'email']:
         if col in df.columns:
             df[col] = df[col].where(pd.isna(df[col]), df[col].astype(str).str.strip())
@@ -57,6 +59,10 @@ def clean_etudiant_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def clean_module_df(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Cleans module DataFrame.
+    Returns: Cleaned DataFrame.
+    """
     df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
     df = df.rename(columns={
         'seuil': 'seuil_validation',
@@ -80,6 +86,10 @@ def clean_module_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def clean_evaluation_df(df: pd.DataFrame, session: Session) -> pd.DataFrame:
+    """
+    Cleans evaluation DataFrame and maps module names to IDs.
+    Returns: Cleaned DataFrame.
+    """
     df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_').str.replace('-', '_')
     
     df = df.rename(columns={
@@ -124,6 +134,10 @@ def clean_evaluation_df(df: pd.DataFrame, session: Session) -> pd.DataFrame:
     return df
 
 def clean_note_df(df: pd.DataFrame, session: Session) -> pd.DataFrame:
+    """
+    Cleans grade/note DataFrame and maps students and evaluations to IDs.
+    Returns: Cleaned DataFrame.
+    """
     df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_').str.replace('-', '_')
     
     df = df.rename(columns={
@@ -131,25 +145,6 @@ def clean_note_df(df: pd.DataFrame, session: Session) -> pd.DataFrame:
         'evaluation': 'nom_evaluation', 'nom_eval': 'nom_evaluation', 'id_evaluation': 'id_evaluation',
         'note': 'valeur', 'valeur': 'valeur'
     })
-
-    def _header_looks_like_data(cols):
-        import re
-        data_like = 0
-        total = len(cols)
-        for c in cols:
-            s = str(c).strip()
-            if s.isdigit() or re.fullmatch(r"[0-9\-/: \.,]+", s):
-                data_like += 1
-        return data_like >= max(2, total // 2)
-
-    if _header_looks_like_data(df.columns):
-        cols = df.shape[1]
-        if cols >= 5:
-            df.columns = ['id', 'id_etudiant', 'id_evaluation', 'valeur', 'date_saisie'] + [f'col{i}' for i in range(5, cols)]
-        elif cols == 4:
-            df.columns = ['id_etudiant', 'id_evaluation', 'valeur', 'date_saisie']
-        elif cols == 3:
-            df.columns = ['id_etudiant', 'id_evaluation', 'valeur']
 
     df = df.replace({np.nan: None, 'nan': None, 'N/A': None, '': None, 'None': None, 'error:.*': None}, regex=True)
 
@@ -189,34 +184,19 @@ def clean_note_df(df: pd.DataFrame, session: Session) -> pd.DataFrame:
     return df
 
 def clean_absence_df(df: pd.DataFrame, session: Session) -> pd.DataFrame:
+    """
+    Cleans absence DataFrame.
+    Returns: Cleaned DataFrame.
+    """
     df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_').str.replace('-', '_')
 
     df = df.rename(columns={
         'étudiant': 'email_etudiant', 'email': 'email_etudiant', 'id_etudiant': 'id_etudiant',
-        'module': 'code_module', 'code_mod': 'code_module', 'nom_module': 'nom_module', 'id_module': 'id_module',
-        'date': 'date_absence', 'date_abs': 'date_absence', 'date_retard': 'date_absence',
-        'heures': 'nb_heures', 'nb_h': 'nb_heures', 'duree': 'nb_heures', 'duree_minutes': 'nb_heures',
+        'module': 'nom_module', 'nom_module': 'nom_module', 'id_module': 'id_module',
+        'date': 'date_absence', 'date_abs': 'date_absence',
+        'heures': 'nb_heures', 'nb_h': 'nb_heures', 'duree': 'nb_heures',
         'justifie': 'justifiee', 'justification': 'justifiee', 'justifié': 'justifiee'
     })
-
-    def _header_looks_like_data(cols):
-        import re
-        data_like = 0
-        total = len(cols)
-        for c in cols:
-            s = str(c).strip()
-            if s.isdigit() or re.fullmatch(r"[0-9\-/: ]+", s):
-                data_like += 1
-        return data_like >= max(2, total // 2)
-
-    if _header_looks_like_data(df.columns):
-        cols = df.shape[1]
-        if cols >= 6:
-            df.columns = ['id', 'id_etudiant', 'id_module', 'date_absence', 'nb_heures', 'justifiee'] + [f'col{i}' for i in range(6, cols)]
-        elif cols == 5:
-            df.columns = ['id_etudiant', 'id_module', 'date_absence', 'nb_heures', 'justifiee']
-        elif cols == 4:
-            df.columns = ['id_etudiant', 'date_absence', 'nb_heures', 'justifiee']
 
     df = df.replace({np.nan: None, 'nan': None, 'N/A': None, 'None': None, 'error:.*': None}, regex=True)
 
@@ -229,23 +209,14 @@ def clean_absence_df(df: pd.DataFrame, session: Session) -> pd.DataFrame:
         else:
             df['id_etudiant'] = df['id_etudiant'].fillna(df_emails.map(etudiant_map))
 
-    if 'code_module' in df.columns or 'nom_module' in df.columns:
-        modules_db = session.exec(select(Module.code_module, Module.nom_module, Module.id)).all()
-        code_map = {normalize_string(m.code_module): m.id for m in modules_db if m.code_module}
-        nom_map = {normalize_string(m.nom_module): m.id for m in modules_db if m.nom_module}
+    if 'nom_module' in df.columns:
+        modules_db = session.exec(select(Module.nom, Module.id)).all()
+        nom_map = {normalize_string(m.nom): m.id for m in modules_db}
 
         if 'id_module' not in df.columns:
             df['id_module'] = None
-        if 'code_module' in df.columns:
-            df_code = df['code_module'].apply(normalize_string)
-            df['id_module'] = df['id_module'].fillna(df_code.map(code_map))
-        if 'nom_module' in df.columns:
-            df_nom = df['nom_module'].apply(normalize_string)
-            df['id_module'] = df['id_module'].fillna(df_nom.map(nom_map))
-
-    df = df.dropna(subset=['id_etudiant', 'id_module', 'date_absence'])
-    df['id_etudiant'] = df['id_etudiant'].astype(int)
-    df['id_module'] = df['id_module'].astype(int)
+        df_nom = df['nom_module'].apply(normalize_string)
+        df['id_module'] = df['id_module'].fillna(df_nom.map(nom_map))
 
     if 'nb_heures' in df.columns:
         if df['nb_heures'].dtype == object:
@@ -260,8 +231,8 @@ def clean_absence_df(df: pd.DataFrame, session: Session) -> pd.DataFrame:
     else:
         df['justifiee'] = False
 
-    df['date_absence'] = pd.to_datetime(df['date_absence'], errors='coerce').dt.date
-    df = df.dropna(subset=['date_absence'])
+    if 'date_absence' in df.columns:
+        df['date_absence'] = pd.to_datetime(df['date_absence'], errors='coerce').dt.date
 
     if 'motif' in df.columns:
         df['motif'] = df['motif'].astype(str).str.strip()
@@ -270,34 +241,18 @@ def clean_absence_df(df: pd.DataFrame, session: Session) -> pd.DataFrame:
     return df
 
 def clean_retard_df(df: pd.DataFrame, session: Session) -> pd.DataFrame:
+    """
+    Cleans tardiness DataFrame.
+    Returns: Cleaned DataFrame.
+    """
     df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_').str.replace('-', '_')
     df = df.rename(columns={
         'étudiant': 'email_etudiant', 'email': 'email_etudiant',
-        'module': 'code_module', 'nom_module': 'code_module',
+        'module': 'nom_module', 'nom_module': 'nom_module',
         'date': 'date_retard', 'date_absence': 'date_retard', 'duree': 'duree_minutes', 'nb_heures': 'duree_minutes',
         'justifie': 'est_justifie', 'justification': 'est_justifie', 'justifié': 'est_justifie', 'justifiee': 'est_justifie'
     })
 
-    def _header_looks_like_data(cols):
-        import re
-        data_like = 0
-        total = len(cols)
-        for c in cols:
-            s = str(c).strip()
-            if s.isdigit() or re.fullmatch(r"[0-9\-/: ]+", s):
-                data_like += 1
-        return data_like >= max(2, total // 2)
-
-    if _header_looks_like_data(df.columns):
-        cols = df.shape[1]
-        if cols >= 6:
-            df.columns = ['id', 'id_etudiant', 'id_module', 'date_retard', 'duree_minutes', 'est_justifie'] + [f'col{i}' for i in range(6, cols)]
-        elif cols == 5:
-            df.columns = ['id_etudiant', 'id_module', 'date_retard', 'duree_minutes', 'est_justifie']
-        elif cols == 4:
-            df.columns = ['id_etudiant', 'date_retard', 'duree_minutes', 'est_justifie']
-
-    df = df.replace(r'^\s*$', np.nan, regex=True)
     df = df.replace(['nan', 'N/A', 'None', 'none', ''], np.nan)
     df = df.replace({r'error:.*': np.nan}, regex=True)
 
@@ -307,21 +262,18 @@ def clean_retard_df(df: pd.DataFrame, session: Session) -> pd.DataFrame:
         df_emails = df['email_etudiant'].astype(str).str.strip().str.lower()
         df['id_etudiant'] = df_emails.map(etudiant_map)
 
-    if 'code_module' in df.columns:
-        modules_db = session.exec(select(Module.code_module, Module.id)).all()
-        module_map = {str(m.code_module).strip().lower(): m.id for m in modules_db if m.code_module}
-        df_codes = df['code_module'].astype(str).str.strip().str.lower()
-        df['id_module'] = df_codes.map(module_map)
+    if 'nom_module' in df.columns:
+        modules_db = session.exec(select(Module.nom, Module.id)).all()
+        module_map = {normalize_string(m.nom): m.id for m in modules_db}
+        df_nom = df['nom_module'].apply(normalize_string)
+        df['id_module'] = df_nom.map(module_map)
 
     for col in ['id_etudiant', 'id_module']:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
-            df = df.dropna(subset=[col])
-            df[col] = df[col].astype(int)
 
     if 'date_retard' in df.columns:
-        df['date_retard'] = pd.to_datetime(df['date_retard'], errors='coerce', dayfirst=True)
-        df = df.dropna(subset=['date_retard'])
+        df['date_retard'] = pd.to_datetime(df['date_retard'], errors='coerce')
 
     if 'duree_minutes' in df.columns:
         if df['duree_minutes'].dtype == object:
@@ -330,12 +282,10 @@ def clean_retard_df(df: pd.DataFrame, session: Session) -> pd.DataFrame:
         df['duree_minutes'] = pd.to_numeric(df['duree_minutes'], errors='coerce')
         df.loc[df['duree_minutes'] < 0, 'duree_minutes'] = np.nan
         df['duree_minutes'] = df['duree_minutes'].astype('Int64')
-    else:
-        df['duree_minutes'] = pd.Series([pd.NA] * len(df), dtype='Int64')
 
     if 'est_justifie' in df.columns:
         df['est_justifie'] = df['est_justifie'].astype(str).str.strip().str.lower().isin(
-            ['true', '1', 'oui', 'yes', 'justifié', 'justifie', 'vrai', 'v', 't', 'vrai']
+            ['true', '1', 'oui', 'yes', 'justifié', 'justifie', 'vrai', 'v', 't']
         )
     else:
         df['est_justifie'] = False
@@ -343,6 +293,10 @@ def clean_retard_df(df: pd.DataFrame, session: Session) -> pd.DataFrame:
     return df
 
 def clean_filiere_df(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Cleans filiere DataFrame.
+    Returns: Cleaned DataFrame.
+    """
     df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
     df = df.rename(columns={'nom': 'nom_filiere'})
     df = df.dropna(subset=['nom_filiere'])
@@ -352,6 +306,10 @@ def clean_filiere_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def clean_classe_df(df: pd.DataFrame, session: Session) -> pd.DataFrame:
+    """
+    Cleans class DataFrame and maps filieres to IDs.
+    Returns: Cleaned DataFrame.
+    """
     df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
     df = df.rename(columns={'filiere': 'nom_filiere'})
     df = df.dropna(subset=['nom'])

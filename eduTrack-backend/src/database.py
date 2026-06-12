@@ -1,14 +1,18 @@
+from decouple import config as decouple_config
+from sqlmodel import Session, create_engine, SQLModel
 from sqlalchemy import inspect, text
-from sqlmodel import SQLModel, Session, create_engine
-from .config import DATABASE_URL
-from . import models
+
+DATABASE_URL = decouple_config("DATABASE_URL", default="sqlite:///./edutrack.db")
 
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is not set")
 
-engine = create_engine(DATABASE_URL, echo=False) # set True only for debug
+engine = create_engine(DATABASE_URL, echo=False)
 
-def _ensure_utilisateur_columns() -> None:
+def _run_migrations() -> None:
+    """
+    Migration utility to ensure the database schema is up-to-date.
+    """
     inspector = inspect(engine)
     if "utilisateurs" not in inspector.get_table_names():
         return
@@ -22,12 +26,17 @@ def _ensure_utilisateur_columns() -> None:
         if "role" not in columns:
             connection.execute(text("ALTER TABLE utilisateurs ADD COLUMN role VARCHAR(50) DEFAULT 'PROF'"))
 
-
 def init_db():
-    print("Initializing database...")
+    """
+    Initialize the database by creating all tables and running migrations.
+    """
     SQLModel.metadata.create_all(engine)
-    _ensure_utilisateur_columns()
+    _run_migrations()
 
 def get_session():
+    """
+    Dependency to get a SQLAlchemy session for database operations.
+    Yields: A SQLModel session.
+    """
     with Session(engine) as session:
         yield session
